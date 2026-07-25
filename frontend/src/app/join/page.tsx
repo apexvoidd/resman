@@ -7,6 +7,7 @@ import {
   findGuestTable,
   GuestStatusResponse,
   initGuestSession,
+  markAtTable,
 } from "@/services/guest";
 
 export default function JoinPage() {
@@ -66,7 +67,6 @@ export default function JoinPage() {
       setCountdown((prev) => {
         if (prev === null || prev <= 1) {
           clearInterval(interval);
-          // Trigger refresh when reservation expires
           if (sessionToken) {
             fetchGuestStatus(sessionToken).then(setStatusData).catch(() => {});
           }
@@ -96,6 +96,22 @@ export default function JoinPage() {
     return () => clearInterval(interval);
   }, [cooldownTimer]);
 
+  // 4. Live Polling for Verification State Changes (every 3 seconds when awaiting verification)
+  useEffect(() => {
+    if (!sessionToken || statusData?.verification_status !== "awaiting_verification") return;
+
+    const pollInterval = setInterval(() => {
+      fetchGuestStatus(sessionToken)
+        .then((res) => {
+          setStatusData(res);
+          if (res.remaining_seconds) setCountdown(res.remaining_seconds);
+        })
+        .catch(() => {});
+    }, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [sessionToken, statusData?.verification_status]);
+
   const handleFindTable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sessionToken) return;
@@ -120,6 +136,9 @@ export default function JoinPage() {
         capacity: res.capacity,
         reservation_expires_at: res.reservation_expires_at,
         remaining_seconds: res.remaining_seconds,
+        verification_status: res.verification_status || "none",
+        rejection_reason: res.rejection_reason,
+        menu_unlocked: res.menu_unlocked || false,
         in_queue: res.in_queue,
         queue_id: res.queue_id,
         queue_position: res.queue_position,
@@ -135,6 +154,26 @@ export default function JoinPage() {
     } catch (err: unknown) {
       const e = err as Error;
       setErrorMsg(e.message || "Failed to reserve a table.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleImAtTable = async () => {
+    if (!sessionToken) return;
+
+    try {
+      setSubmitting(true);
+      setErrorMsg(null);
+
+      const res = await markAtTable(sessionToken);
+      setStatusData(res);
+      if (res.remaining_seconds) {
+        setCountdown(res.remaining_seconds);
+      }
+    } catch (err: unknown) {
+      const e = err as Error;
+      setErrorMsg(e.message || "Failed to notify waiter.");
     } finally {
       setSubmitting(false);
     }
@@ -207,6 +246,9 @@ export default function JoinPage() {
   const hasReservation = statusData?.has_active_reservation && statusData?.table_number;
   const inQueue = statusData?.in_queue;
   const isCooldown = (cooldownTimer !== null && cooldownTimer > 0) || statusData?.cooldown_active;
+  const isVerified = statusData?.verification_status === "confirmed" || statusData?.table_status === "occupied" || statusData?.menu_unlocked;
+  const isAwaiting = statusData?.verification_status === "awaiting_verification" || statusData?.table_status === "awaiting_verification";
+  const isRejected = statusData?.verification_status === "rejected";
 
   return (
     <div className="min-h-screen bg-gray-950 px-4 py-8 text-gray-100 sm:px-6 lg:px-8">
@@ -240,8 +282,24 @@ export default function JoinPage() {
         {hasReservation ? (
           <div className="space-y-6 rounded-2xl border border-emerald-500/20 bg-gray-900/90 p-6 backdrop-blur shadow-xl">
             <div className="flex items-center justify-between">
-              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400 ring-1 ring-emerald-500/20">
-                Table Reserved
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+                  isVerified
+                    ? "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20"
+                    : isAwaiting
+                    ? "bg-amber-500/10 text-amber-400 ring-amber-500/20 animate-pulse"
+                    : isRejected
+                    ? "bg-red-500/10 text-red-400 ring-red-500/20"
+                    : "bg-blue-500/10 text-blue-400 ring-blue-500/20"
+                }`}
+              >
+                {isVerified
+                  ? "Occupied & Verified"
+                  : isAwaiting
+                  ? "Awaiting Waiter Verification"
+                  : isRejected
+                  ? "Verification Rejected"
+                  : "Table Reserved"}
               </span>
               <span className="text-xs text-gray-400">Entrance Assignment</span>
             </div>
@@ -256,8 +314,28 @@ export default function JoinPage() {
               </p>
             </div>
 
-            {/* Countdown timer */}
-            {countdown !== null && countdown > 0 && (
+            {/* VERIFICATION STATE BANNERS */}
+            {isVerified ? (
+              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-center">
+                <p className="text-sm font-semibold text-emerald-400">✅ Arrival Confirmed by Waiter</p>
+                <p className="mt-1 text-xs text-emerald-300">Welcome! Your digital menu access is unlocked.</p>
+              </div>
+            ) : isAwaiting ? (
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 text-center animate-pulse">
+                <p className="text-sm font-semibold text-amber-400">⏳ Waiter Notified</p>
+                <p className="mt-1 text-xs text-amber-300">Staff will arrive at Table {statusData.table_number} shortly to verify.</p>
+              </div>
+            ) : isRejected ? (
+              <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-4 text-center">
+                <p className="text-sm font-semibold text-red-400">❌ Verification Rejected</p>
+                <p className="mt-1 text-xs text-red-300">
+                  {statusData.rejection_reason || "Staff could not locate your party at the table."}
+                </p>
+              </div>
+            ) : null}
+
+            {/* Countdown timer (show when not verified yet) */}
+            {!isVerified && countdown !== null && countdown > 0 && (
               <div className="rounded-xl bg-gray-950 p-4 text-center ring-1 ring-white/10">
                 <p className="text-xs text-gray-400">Reservation Expiration Timer</p>
                 <div className="my-1 font-mono text-3xl font-bold tracking-wider text-amber-400">
@@ -274,6 +352,28 @@ export default function JoinPage() {
             )}
 
             <div className="flex flex-col gap-3 pt-2">
+              {/* "I'm at my table" Action Button */}
+              {!isVerified && !isAwaiting && (
+                <button
+                  type="button"
+                  onClick={handleImAtTable}
+                  disabled={submitting}
+                  className="w-full rounded-xl bg-emerald-500 py-3.5 text-sm font-bold text-gray-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/10 disabled:opacity-50"
+                >
+                  {submitting ? "Notifying Staff..." : "📍 I'm at my Table"}
+                </button>
+              )}
+
+              {isVerified && (
+                <button
+                  type="button"
+                  onClick={() => alert("Digital Menu feature will be available in next module!")}
+                  className="w-full rounded-xl bg-emerald-500 py-3.5 text-sm font-bold text-gray-950 hover:bg-emerald-400 transition"
+                >
+                  📖 Browse Digital Menu
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleRefresh}
@@ -282,14 +382,17 @@ export default function JoinPage() {
               >
                 Refresh Status
               </button>
-              <button
-                type="button"
-                onClick={handleCancel}
-                disabled={submitting}
-                className="w-full rounded-xl border border-red-500/20 bg-red-500/10 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/20 transition disabled:opacity-50"
-              >
-                Cancel Reservation
-              </button>
+
+              {!isVerified && (
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={submitting}
+                  className="w-full rounded-xl border border-red-500/20 bg-red-500/10 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/20 transition disabled:opacity-50"
+                >
+                  Cancel Reservation
+                </button>
+              )}
             </div>
           </div>
         ) : inQueue ? (

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 TableStatus = Literal[
     "available",
     "reserved",
+    "awaiting_verification",
     "occupied",
     "billing",
     "cleaning",
@@ -20,6 +21,7 @@ TableStatus = Literal[
 VALID_STATUSES = (
     "available",
     "reserved",
+    "awaiting_verification",
     "occupied",
     "billing",
     "cleaning",

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user, require_role
 from app.db.session import get_db
 from app.models.staff import User
+from app.schemas.guest import PendingVerificationTable, VerificationActionInput
 from app.schemas.table import (
     TableCreate,
     TableListResponse,
@@ -24,6 +25,38 @@ from app.schemas.table import (
 from app.services import table as table_service
 
 router = APIRouter(prefix="/tables", tags=["Table Management"])
+
+
+@router.get(
+    "/verification-requests",
+    response_model=list[PendingVerificationTable],
+    summary="List all tables awaiting arrival verification (Waiters, Managers, Admins)",
+    status_code=status.HTTP_200_OK,
+)
+async def list_verification_requests(
+    _: User = Depends(require_role(["waiter", "manager", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Retrieve all tables in 'awaiting_verification' status for waiter dashboard."""
+    return await table_service.get_pending_verifications(db)
+
+
+@router.post(
+    "/{table_id}/verify",
+    response_model=TableOut,
+    summary="Waiter confirms or rejects customer arrival",
+    status_code=status.HTTP_200_OK,
+)
+async def verify_arrival(
+    table_id: uuid.UUID,
+    payload: VerificationActionInput,
+    current_user: User = Depends(require_role(["waiter", "manager", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Confirm or reject customer arrival at assigned table."""
+    return await table_service.verify_customer_arrival(
+        db, table_id, payload, current_user
+    )
 
 
 @router.get(

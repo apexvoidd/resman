@@ -83,6 +83,16 @@ class GuestSession(BaseModel):
     cooldown_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    verification_status: Mapped[str] = mapped_column(
+        String(50), default="none", nullable=False, index=True
+    )  # none, awaiting_verification, confirmed, rejected
+    verification_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    rejection_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    occupied_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

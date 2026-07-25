@@ -1,17 +1,22 @@
 """
-Table Management service layer for DB operations.
+Table Management service layer for DB operations and Waiter Verification workflows.
 """
 
 import math
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.audit import AuditLog
+from app.models.customer import GuestSession
+from app.models.notification import Notification
 from app.models.restaurant import Branch, Restaurant
+from app.models.staff import User
 from app.models.table import DiningTable
+from app.schemas.guest import PendingVerificationTable, VerificationActionInput
 from app.schemas.table import (
     TableCreate,
     TableListResponse,
@@ -47,7 +52,6 @@ async def get_or_create_default_branch(db: AsyncSession) -> Branch:
     if branch is not None:
         return branch
 
-    # Check if a restaurant exists
     res_result = await db.execute(
         select(Restaurant).where(Restaurant.is_active.is_(True)).limit(1)
     )
@@ -82,7 +86,7 @@ async def get_table_list(
     exact_capacity: int | None = None,
     is_active: bool | None = None,
     page: int = 1,
-    page_size: int = 10,
+    page_size: int = 50,
 ) -> TableListResponse:
     """
     Fetch paginated dining tables with search and status/capacity filters.
@@ -95,31 +99,25 @@ async def get_table_list(
         DiningTable.deleted_at.is_(None),
     )
 
-    # Search by table number
     if search and search.strip():
         term = f"%{search.strip()}%"
         query = query.where(DiningTable.table_number.ilike(term))
 
-    # Filter by status
     if table_status and table_status.strip():
         query = query.where(DiningTable.status == table_status.strip())
 
-    # Filter by capacity
     if exact_capacity is not None:
         query = query.where(DiningTable.capacity == exact_capacity)
     elif min_capacity is not None:
         query = query.where(DiningTable.capacity >= min_capacity)
 
-    # Filter by active state
     if is_active is not None:
         query = query.where(DiningTable.is_active.is_(is_active))
 
-    # Count total matching rows
     count_query = select(func.count()).select_from(query.subquery())
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
 
-    # Pagination
     offset = (page - 1) * page_size
     query = query.order_by(DiningTable.table_number.asc()).offset(offset).limit(page_size)
 
@@ -155,13 +153,9 @@ async def get_table_by_id(db: AsyncSession, table_id: uuid.UUID) -> TableOut:
 
 
 async def create_table(db: AsyncSession, payload: TableCreate) -> TableOut:
-    """
-    Create a new dining table.
-    Checks for duplicate table number within the branch and raises 409 Conflict if found.
-    """
+    """Create a new dining table."""
     branch = await get_or_create_default_branch(db)
 
-    # Check duplicate table_number in branch
     existing = await db.execute(
         select(DiningTable).where(
             DiningTable.branch_id == branch.id,
@@ -207,7 +201,6 @@ async def update_table(
             detail=f"Table with ID '{table_id}' not found.",
         )
 
-    # Check duplicate table_number if being updated
     if (
         payload.table_number
         and payload.table_number.lower() != table.table_number.lower()
@@ -291,4 +284,177 @@ async def delete_table(db: AsyncSession, table_id: uuid.UUID) -> None:
     table.deleted_at = datetime.now(UTC)
     table.is_active = False
     table.status = "out_of_service"
+    await db.commit()
+
+
+async def get_pending_verifications(db: AsyncSession) -> list[PendingVerificationTable]:
+    """Fetch all tables currently awaiting waiter verification."""
+    now = datetime.now(timezone.utc)
+    branch = await get_or_create_default_branch(db)
+
+    result = await db.execute(
+        select(DiningTable, GuestSession)
+        .join(GuestSession, GuestSession.table_id == DiningTable.id)
+        .where(
+            DiningTable.branch_id == branch.id,
+            DiningTable.deleted_at.is_(None),
+            DiningTable.status == "awaiting_verification",
+        )
+        .order_by(DiningTable.table_number.asc())
+    )
+    rows = result.all()
+
+    out: list[PendingVerificationTable] = []
+    for tbl, sess in rows:
+        elapsed = 0
+        if sess.verification_requested_at:
+            elapsed = int((now - sess.verification_requested_at).total_seconds())
+
+        out.append(
+            PendingVerificationTable(
+                table_id=tbl.id,
+                table_number=tbl.table_number,
+                capacity=tbl.capacity,
+                guest_session_id=sess.id,
+                guest_name=sess.guest_name,
+                guest_count=sess.guest_count or 1,
+                verification_requested_at=sess.verification_requested_at,
+                time_elapsed_seconds=max(0, elapsed),
+            )
+        )
+
+    # Trigger automatic 3-minute no-order check while querying
+    await check_no_order_reminders(db)
+
+    return out
+
+
+async def verify_customer_arrival(
+    db: AsyncSession,
+    table_id: uuid.UUID,
+    payload: VerificationActionInput,
+    current_user: User,
+) -> TableOut:
+    """
+    Waiter confirms or rejects customer arrival:
+    - If confirm: table -> 'occupied', guest_session -> 'confirmed', menu unlocked.
+    - If reject: table -> 'reserved', guest_session -> 'rejected' with reason.
+    """
+    now = datetime.now(timezone.utc)
+
+    result = await db.execute(
+        select(DiningTable).where(
+            DiningTable.id == table_id, DiningTable.deleted_at.is_(None)
+        ).with_for_update()
+    )
+    table = result.scalar_one_or_none()
+    if table is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Table with ID '{table_id}' not found.",
+        )
+
+    if table.status != "awaiting_verification":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Table {table.table_number} is in status '{table.status}' and not awaiting verification.",
+        )
+
+    sess_res = await db.execute(
+        select(GuestSession).where(
+            GuestSession.table_id == table.id,
+            GuestSession.is_active == True,  # noqa: E712
+        )
+    )
+    sess = sess_res.scalar_one_or_none()
+
+    if payload.action == "confirm":
+        table.status = "occupied"
+        if sess:
+            sess.verification_status = "confirmed"
+            sess.occupied_at = now
+            sess.rejection_reason = None
+
+        db.add(
+            AuditLog(
+                user_id=current_user.id,
+                action="VERIFY_ARRIVAL_CONFIRMED",
+                entity="DiningTable",
+                entity_id=table.id,
+                old_value={"status": "awaiting_verification"},
+                new_value={"status": "occupied", "waiter_user_id": str(current_user.id)},
+            )
+        )
+        db.add(
+            Notification(
+                recipient_type="manager",
+                title=f"Table {table.table_number} Seated",
+                message=f"Staff member {current_user.full_name or current_user.email} confirmed guest arrival for Table {table.table_number}.",
+                notification_type="arrival_confirmed",
+                status="unread",
+                payload_json={"table_id": str(table.id), "table_number": table.table_number},
+            )
+        )
+    else:  # reject
+        table.status = "reserved"
+        if sess:
+            sess.verification_status = "rejected"
+            sess.rejection_reason = payload.reason or "Arrival verification rejected by staff member."
+
+        db.add(
+            AuditLog(
+                user_id=current_user.id,
+                action="VERIFY_ARRIVAL_REJECTED",
+                entity="DiningTable",
+                entity_id=table.id,
+                old_value={"status": "awaiting_verification"},
+                new_value={"status": "reserved", "reason": payload.reason},
+            )
+        )
+
+    await db.commit()
+    await db.refresh(table)
+    return _build_table_out(table)
+
+
+async def check_no_order_reminders(db: AsyncSession) -> None:
+    """
+    Automatic 3-minute reminder:
+    If a table has been occupied for 3+ minutes and no order is placed,
+    send a reminder notification to waiters.
+    """
+    now = datetime.now(timezone.utc)
+    threshold = now - timedelta(minutes=3)
+
+    result = await db.execute(
+        select(GuestSession, DiningTable)
+        .join(DiningTable, DiningTable.id == GuestSession.table_id)
+        .where(
+            GuestSession.verification_status == "confirmed",
+            GuestSession.occupied_at.is_not(None),
+            GuestSession.occupied_at <= threshold,
+            DiningTable.status == "occupied",
+        )
+    )
+    occupied_sessions = result.all()
+
+    for sess, tbl in occupied_sessions:
+        # Check existing 3-minute notification to avoid duplicates
+        existing_notif = await db.execute(
+            select(Notification).where(
+                Notification.notification_type == "no_order_reminder",
+                Notification.payload_json["table_id"].as_string() == str(tbl.id),
+            )
+        )
+        if existing_notif.scalar_one_or_none() is None:
+            db.add(
+                Notification(
+                    recipient_type="waiter",
+                    title=f"3-Min Order Alert: Table {tbl.table_number}",
+                    message=f"Table {tbl.table_number} ({sess.guest_name or 'Guest'}) has been occupied for over 3 minutes with no order placed.",
+                    notification_type="no_order_reminder",
+                    status="unread",
+                    payload_json={"table_id": str(tbl.id), "table_number": tbl.table_number},
+                )
+            )
     await db.commit()

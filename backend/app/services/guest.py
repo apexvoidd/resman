@@ -1,6 +1,6 @@
 """
 Service layer for Guest Sessions, QR entrance smart table assignment,
-and queue allocation logic with race-condition prevention and cooldown enforcement.
+queue allocation, customer arrival verification, and cooldown enforcement.
 """
 
 import logging
@@ -12,7 +12,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.audit import AuditLog
 from app.models.customer import GuestSession
+from app.models.notification import Notification
 from app.models.restaurant import Branch
 from app.models.table import DiningTable, QueueEntry
 from app.schemas.guest import (
@@ -35,7 +37,6 @@ async def _get_default_branch(db: AsyncSession) -> Branch:
     )
     branch = result.scalar_one_or_none()
     if not branch:
-        # Fallback to any branch if no explicit active flag
         result = await db.execute(select(Branch).limit(1))
         branch = result.scalar_one_or_none()
         if not branch:
@@ -84,7 +85,6 @@ async def release_expired_reservations(db: AsyncSession, branch_id: UUID) -> Non
     """Find and release any reservations that have passed their 5-minute expiry time."""
     now = datetime.now(timezone.utc)
 
-    # 1. Find expired sessions
     expired_result = await db.execute(
         select(GuestSession).where(
             GuestSession.branch_id == branch_id,
@@ -101,10 +101,11 @@ async def release_expired_reservations(db: AsyncSession, branch_id: UUID) -> Non
                 select(DiningTable).where(DiningTable.id == sess.table_id)
             )
             tbl = table_res.scalar_one_or_none()
-            if tbl and tbl.status == "reserved":
+            if tbl and tbl.status in ("reserved", "awaiting_verification"):
                 tbl.status = "available"
             sess.table_id = None
             sess.reservation_expires_at = None
+            sess.verification_status = "none"
 
     await db.commit()
 
@@ -121,7 +122,6 @@ async def find_table_or_enqueue(
     """
     now = datetime.now(timezone.utc)
 
-    # 1. Enforce cooldown if guest recently cancelled
     if session.cooldown_until and session.cooldown_until > now:
         remaining = int((session.cooldown_until - now).total_seconds())
         raise HTTPException(
@@ -132,7 +132,6 @@ async def find_table_or_enqueue(
             ),
         )
 
-    # 2. Return existing unexpired reservation if present
     if session.table_id and session.reservation_expires_at and session.reservation_expires_at > now:
         tbl_res = await db.execute(
             select(DiningTable).where(DiningTable.id == session.table_id)
@@ -147,20 +146,19 @@ async def find_table_or_enqueue(
             capacity=table.capacity if table else payload.guest_count,
             reservation_expires_at=session.reservation_expires_at,
             remaining_seconds=rem_sec,
-            message=f"Table {table.table_number if table else ''} is already reserved for your session.",
+            verification_status=session.verification_status,
+            rejection_reason=session.rejection_reason,
+            menu_unlocked=session.verification_status == "confirmed" or (table and table.status == "occupied"),
+            message=f"Table {table.table_number if table else ''} is reserved for your session.",
         )
 
-    # 3. Clean up expired reservations first
     branch_id = session.branch_id or (await _get_default_branch(db)).id
     await release_expired_reservations(db, branch_id)
 
-    # Update session details
     session.guest_name = payload.name
     session.guest_email = payload.email
     session.guest_count = payload.guest_count
 
-    # 4. Search for candidate tables with row locking (SELECT ... FOR UPDATE)
-    # Ignore tables in: cleaning, reserved, occupied, out_of_service
     stmt = (
         select(DiningTable)
         .where(
@@ -178,15 +176,14 @@ async def find_table_or_enqueue(
     candidate_tables = candidate_res.scalars().all()
 
     if candidate_tables:
-        # Best match: smallest available table that fits the group
         best_table = candidate_tables[0]
         reservation_expiry = now + timedelta(minutes=RESERVATION_DURATION_MINUTES)
 
         best_table.status = "reserved"
         session.table_id = best_table.id
         session.reservation_expires_at = reservation_expiry
+        session.verification_status = "none"
 
-        # If user was in queue, update queue status to seated
         queue_res = await db.execute(
             select(QueueEntry).where(
                 QueueEntry.guest_session_id == session.id,
@@ -209,10 +206,12 @@ async def find_table_or_enqueue(
             capacity=best_table.capacity,
             reservation_expires_at=reservation_expiry,
             remaining_seconds=remaining_sec,
+            verification_status=session.verification_status,
+            rejection_reason=session.rejection_reason,
+            menu_unlocked=False,
             message=f"Table {best_table.table_number} reserved successfully for {RESERVATION_DURATION_MINUTES} minutes!",
         )
 
-    # 5. No suitable table available — append guest to Queue
     q_existing = await db.execute(
         select(QueueEntry).where(
             QueueEntry.guest_session_id == session.id,
@@ -222,7 +221,6 @@ async def find_table_or_enqueue(
     existing_q = q_existing.scalar_one_or_none()
 
     if not existing_q:
-        # Calculate queue position
         count_res = await db.execute(
             select(func.count(QueueEntry.id)).where(
                 QueueEntry.branch_id == branch_id,
@@ -250,7 +248,6 @@ async def find_table_or_enqueue(
     else:
         q_item = existing_q
 
-    # Calculate actual waiting position
     pos_res = await db.execute(
         select(func.count(QueueEntry.id)).where(
             QueueEntry.branch_id == branch_id,
@@ -274,6 +271,114 @@ async def find_table_or_enqueue(
     )
 
 
+async def mark_at_table(
+    db: AsyncSession, session: GuestSession
+) -> GuestStatusOut:
+    """
+    Customer presses 'I'm at my table':
+    1. Validates that session holds an active reserved table.
+    2. Transitions table status to 'awaiting_verification'.
+    3. Notifies waiters in real time & writes AuditLog.
+    """
+    now = datetime.now(timezone.utc)
+
+    if not session.table_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No table reservation associated with this guest session.",
+        )
+
+    tbl_res = await db.execute(
+        select(DiningTable).where(DiningTable.id == session.table_id).with_for_update()
+    )
+    table = tbl_res.scalar_one_or_none()
+
+    if not table:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Assigned dining table not found.",
+        )
+
+    if table.status == "occupied":
+        rem_sec = int((session.reservation_expires_at - now).total_seconds()) if session.reservation_expires_at and session.reservation_expires_at > now else None
+        return GuestStatusOut(
+            session_token=session.session_token,
+            guest_name=session.guest_name,
+            guest_count=session.guest_count,
+            has_active_reservation=True,
+            table_id=table.id,
+            table_number=table.table_number,
+            capacity=table.capacity,
+            table_status="occupied",
+            reservation_expires_at=session.reservation_expires_at,
+            remaining_seconds=rem_sec,
+            verification_status="confirmed",
+            menu_unlocked=True,
+            in_queue=False,
+            message="Arrival already confirmed by staff.",
+        )
+
+    if table.status not in ("reserved", "awaiting_verification"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Table {table.table_number} is in state '{table.status}' and cannot be requested for verification.",
+        )
+
+    old_status = table.status
+    table.status = "awaiting_verification"
+    session.verification_status = "awaiting_verification"
+    session.verification_requested_at = now
+    session.rejection_reason = None
+
+    # Audit log entry
+    audit = AuditLog(
+        action="TABLE_AWAITING_VERIFICATION",
+        entity="DiningTable",
+        entity_id=table.id,
+        old_value={"status": old_status},
+        new_value={"status": "awaiting_verification", "session_token": session.session_token},
+    )
+    db.add(audit)
+
+    # Realtime notification record for waiters
+    notif = Notification(
+        recipient_type="waiter",
+        title=f"Arrival Verification: Table {table.table_number}",
+        message=f"Guest '{session.guest_name or 'Walk-in'}' ({session.guest_count or 1} guests) has arrived at Table {table.table_number} and requests verification.",
+        notification_type="arrival_verification",
+        status="unread",
+        payload_json={
+            "table_id": str(table.id),
+            "table_number": table.table_number,
+            "guest_session_id": str(session.id),
+            "guest_name": session.guest_name,
+            "guest_count": session.guest_count,
+        },
+    )
+    db.add(notif)
+
+    await db.commit()
+    await db.refresh(table)
+
+    rem_sec = int((session.reservation_expires_at - now).total_seconds()) if session.reservation_expires_at and session.reservation_expires_at > now else None
+    return GuestStatusOut(
+        session_token=session.session_token,
+        guest_name=session.guest_name,
+        guest_count=session.guest_count,
+        has_active_reservation=True,
+        table_id=table.id,
+        table_number=table.table_number,
+        capacity=table.capacity,
+        table_status="awaiting_verification",
+        reservation_expires_at=session.reservation_expires_at,
+        remaining_seconds=rem_sec,
+        verification_status="awaiting_verification",
+        menu_unlocked=False,
+        in_queue=False,
+        message=f"Verification request sent to waiter for Table {table.table_number}.",
+    )
+
+
 async def cancel_guest_reservation(
     db: AsyncSession, session: GuestSession
 ) -> GuestStatusOut:
@@ -281,19 +386,18 @@ async def cancel_guest_reservation(
     now = datetime.now(timezone.utc)
     cooldown_expiry = now + timedelta(minutes=COOLDOWN_DURATION_MINUTES)
 
-    # 1. Release reserved table if held
     if session.table_id:
         table_res = await db.execute(
             select(DiningTable).where(DiningTable.id == session.table_id)
         )
         table = table_res.scalar_one_or_none()
-        if table and table.status == "reserved":
+        if table and table.status in ("reserved", "awaiting_verification"):
             table.status = "available"
 
         session.table_id = None
         session.reservation_expires_at = None
+        session.verification_status = "none"
 
-    # 2. Cancel waiting queue entry if any
     q_res = await db.execute(
         select(QueueEntry).where(
             QueueEntry.guest_session_id == session.id,
@@ -304,7 +408,6 @@ async def cancel_guest_reservation(
     if q_entry:
         q_entry.status = "cancelled"
 
-    # Set 5-minute cooldown
     session.cooldown_until = cooldown_expiry
     await db.commit()
 
@@ -326,52 +429,51 @@ async def get_guest_session_status(
     """Fetch current live status for a guest session."""
     now = datetime.now(timezone.utc)
 
-    # Check expired reservation
     if (
         session.table_id
         and session.reservation_expires_at
         and session.reservation_expires_at <= now
+        and session.verification_status != "confirmed"
     ):
         await release_expired_reservations(
             db, session.branch_id or (await _get_default_branch(db)).id
         )
         await db.refresh(session)
 
-    # Cooldown check
     cooldown_active = False
     cooldown_rem_sec = None
     if session.cooldown_until and session.cooldown_until > now:
         cooldown_active = True
         cooldown_rem_sec = int((session.cooldown_until - now).total_seconds())
 
-    # Active table reservation
-    if (
-        session.table_id
-        and session.reservation_expires_at
-        and session.reservation_expires_at > now
-    ):
+    if session.table_id:
         tbl_res = await db.execute(
             select(DiningTable).where(DiningTable.id == session.table_id)
         )
         table = tbl_res.scalar_one_or_none()
-        rem_sec = int((session.reservation_expires_at - now).total_seconds())
-        return GuestStatusOut(
-            session_token=session.session_token,
-            guest_name=session.guest_name,
-            guest_count=session.guest_count,
-            has_active_reservation=True,
-            table_id=table.id if table else session.table_id,
-            table_number=table.table_number if table else "N/A",
-            capacity=table.capacity if table else session.guest_count,
-            reservation_expires_at=session.reservation_expires_at,
-            remaining_seconds=rem_sec,
-            in_queue=False,
-            cooldown_active=cooldown_active,
-            cooldown_remaining_seconds=cooldown_rem_sec,
-            message=f"Table {table.table_number if table else ''} reserved.",
-        )
+        if table:
+            rem_sec = int((session.reservation_expires_at - now).total_seconds()) if session.reservation_expires_at and session.reservation_expires_at > now else None
+            menu_unlocked = (session.verification_status == "confirmed") or (table.status == "occupied")
+            return GuestStatusOut(
+                session_token=session.session_token,
+                guest_name=session.guest_name,
+                guest_count=session.guest_count,
+                has_active_reservation=True,
+                table_id=table.id,
+                table_number=table.table_number,
+                capacity=table.capacity,
+                table_status=table.status,
+                reservation_expires_at=session.reservation_expires_at,
+                remaining_seconds=rem_sec,
+                verification_status=session.verification_status,
+                rejection_reason=session.rejection_reason,
+                menu_unlocked=menu_unlocked,
+                in_queue=False,
+                cooldown_active=cooldown_active,
+                cooldown_remaining_seconds=cooldown_rem_sec,
+                message=f"Table {table.table_number} ({table.status}).",
+            )
 
-    # Queue check
     q_res = await db.execute(
         select(QueueEntry).where(
             QueueEntry.guest_session_id == session.id,

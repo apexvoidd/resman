@@ -24,6 +24,9 @@ export interface GuestTableReservationResponse {
   capacity?: number | null;
   reservation_expires_at?: string | null;
   remaining_seconds?: number | null;
+  verification_status?: string;
+  rejection_reason?: string | null;
+  menu_unlocked?: boolean;
   in_queue: boolean;
   queue_id?: string | null;
   queue_position?: number | null;
@@ -41,8 +44,12 @@ export interface GuestStatusResponse {
   table_id?: string | null;
   table_number?: string | null;
   capacity?: number | null;
+  table_status?: string | null;
   reservation_expires_at?: string | null;
   remaining_seconds?: number | null;
+  verification_status?: string;
+  rejection_reason?: string | null;
+  menu_unlocked?: boolean;
   in_queue: boolean;
   queue_id?: string | null;
   queue_position?: number | null;
@@ -95,6 +102,19 @@ export async function findGuestTable(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.detail ?? "Failed to find table.");
+  }
+  return res.json();
+}
+
+export async function markAtTable(
+  sessionToken: string
+): Promise<GuestStatusResponse> {
+  const res = await guestFetch("/at-table", sessionToken, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? "Failed to notify table arrival.");
   }
   return res.json();
 }

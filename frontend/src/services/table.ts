@@ -7,6 +7,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export type TableStatusType =
   | "available"
   | "reserved"
+  | "awaiting_verification"
   | "occupied"
   | "billing"
   | "cleaning"
@@ -171,3 +172,44 @@ export async function deleteTable(
     throw new Error(err?.detail ?? "Failed to delete dining table");
   }
 }
+
+export interface PendingVerificationTable {
+  table_id: string;
+  table_number: string;
+  capacity: number;
+  guest_session_id: string;
+  guest_name?: string | null;
+  guest_count: number;
+  verification_requested_at?: string | null;
+  time_elapsed_seconds: number;
+}
+
+export async function fetchPendingVerifications(
+  token: string
+): Promise<PendingVerificationTable[]> {
+  const res = await authFetch("/tables/verification-requests", token);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? "Failed to fetch verification requests.");
+  }
+  return res.json();
+}
+
+export async function verifyCustomerArrival(
+  token: string,
+  tableId: string,
+  action: "confirm" | "reject",
+  reason?: string
+): Promise<DiningTable> {
+  const res = await authFetch(`/tables/${tableId}/verify`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, reason }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? `Failed to ${action} arrival.`);
+  }
+  return res.json();
+}
+

@@ -18,6 +18,7 @@ from app.services.guest import (
     find_table_or_enqueue,
     get_guest_session_status,
     get_or_create_guest_session,
+    mark_at_table,
 )
 
 router = APIRouter()
@@ -50,6 +51,19 @@ async def find_table(
     return await find_table_or_enqueue(db, session, payload)
 
 
+@router.post("/at-table", response_model=GuestStatusOut)
+async def customer_at_table(
+    x_session_token: str | None = Header(None, alias="X-Session-Token"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Customer presses "I'm at my table".
+    Transitions table status to awaiting_verification and notifies waiters.
+    """
+    session = await get_or_create_guest_session(db, session_token=x_session_token)
+    return await mark_at_table(db, session)
+
+
 @router.post("/cancel", response_model=GuestStatusOut)
 async def cancel_reservation(
     x_session_token: str | None = Header(None, alias="X-Session-Token"),
@@ -73,3 +87,4 @@ async def check_status(
     """
     session = await get_or_create_guest_session(db, session_token=x_session_token)
     return await get_guest_session_status(db, session)
+
