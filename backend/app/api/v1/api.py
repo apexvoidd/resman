@@ -1,6 +1,15 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, guest, health, root, settings, staff, table
+from app.api.v1.endpoints import (
+    auth,
+    guest,
+    health,
+    menu,
+    root,
+    settings,
+    staff,
+    table,
+)
 
 api_router = APIRouter()
 
@@ -22,6 +31,10 @@ api_router.include_router(table.router)
 
 # Guest Session & Entrance QR Endpoints
 api_router.include_router(guest.router, prefix="/guest", tags=["Guest & Entrance QR"])
+
+# Menu & Category Management Endpoints
+api_router.include_router(menu.router)
+
 
 
 

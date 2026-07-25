@@ -76,9 +76,14 @@ class MenuItem(BaseModel, SoftDeleteMixin):
     is_available: Mapped[bool] = mapped_column(
         Boolean, default=True, nullable=False, index=True
     )
+    is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_vegetarian: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_vegan: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_jain: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_gluten_free: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    spicy_level: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     preparation_time_minutes: Mapped[int] = mapped_column(
         Integer, default=15, nullable=False
     )
