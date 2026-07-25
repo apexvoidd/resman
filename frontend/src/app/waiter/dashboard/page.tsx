@@ -13,7 +13,7 @@ import {
 
 export default function WaiterDashboardPage() {
   const { getToken } = useAuth();
-  const { isLoaded, hasRole } = useRBAC();
+  const { isLoading, hasRole } = useRBAC();
 
   const [loading, setLoading] = useState<boolean>(true);
   const [verifications, setVerifications] = useState<PendingVerificationTable[]>([]);
@@ -50,7 +50,7 @@ export default function WaiterDashboardPage() {
   };
 
   useEffect(() => {
-    if (!isLoaded || !isStaffAuthorized) return;
+    if (isLoading || !isStaffAuthorized) return;
 
     loadData();
 
@@ -60,7 +60,7 @@ export default function WaiterDashboardPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isLoaded, isStaffAuthorized]);
+  }, [isLoading, isStaffAuthorized]);
 
   const handleConfirmArrival = async (tableId: string) => {
     try {
@@ -110,7 +110,7 @@ export default function WaiterDashboardPage() {
     return `${m}m ${s}s`;
   };
 
-  if (!isLoaded || loading) {
+  if (isLoading || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-950 text-white">
         <div className="flex flex-col items-center gap-3">

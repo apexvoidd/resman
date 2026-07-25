@@ -3,6 +3,7 @@ import { z } from "zod";
 export const TABLE_STATUSES = [
   "available",
   "reserved",
+  "awaiting_verification",
   "occupied",
   "billing",
   "cleaning",

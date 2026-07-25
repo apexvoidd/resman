@@ -46,6 +46,12 @@ const STATUS_CONFIG: Record<
     textClass: "text-amber-400",
     borderClass: "border-amber-500/30",
   },
+  awaiting_verification: {
+    label: "Awaiting Verification",
+    bgClass: "bg-amber-500/20 animate-pulse",
+    textClass: "text-amber-300",
+    borderClass: "border-amber-500/50",
+  },
   occupied: {
     label: "Occupied",
     bgClass: "bg-blue-500/10",
