@@ -1,0 +1,373 @@
+"use client";
+
+import { useState, useEffect, use } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
+import { useRBAC } from "@/hooks/use-rbac";
+import { fetchRoles, fetchStaffById, updateStaff } from "@/services/staff";
+import {
+  staffUpdateSchema,
+  StaffUpdateFormValues,
+} from "@/lib/validations/staff";
+import Link from "next/link";
+import {
+  Edit2,
+  ArrowLeft,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  ShieldAlert,
+} from "lucide-react";
+
+export default function EditStaffPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id: staffId } = use(params);
+  const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  const { hasRole, isLoading: isRbacLoading } = useRBAC();
+  const isAdmin = hasRole("admin");
+  const router = useRouter();
+
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Fetch roles
+  const { data: roles = [], isLoading: isRolesLoading } = useQuery({
+    queryKey: ["roles"],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("Unauthenticated");
+      return fetchRoles(token);
+    },
+    enabled: !!isSignedIn && isAdmin,
+  });
+
+  // Fetch staff member details
+  const {
+    data: staff,
+    isLoading: isStaffLoading,
+    isError: isStaffError,
+    error: staffError,
+  } = useQuery({
+    queryKey: ["staff", staffId],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("Unauthenticated");
+      return fetchStaffById(token, staffId);
+    },
+    enabled: !!isSignedIn && isAdmin && !!staffId,
+  });
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<StaffUpdateFormValues>({
+    resolver: zodResolver(staffUpdateSchema),
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      role_codes: [],
+      is_active: true,
+    },
+  });
+
+  useEffect(() => {
+    if (staff) {
+      reset({
+        first_name: staff.first_name || "",
+        last_name: staff.last_name || "",
+        email: staff.email || "",
+        phone: staff.phone || "",
+        role_codes: staff.roles.map((r) => r.code),
+        is_active: staff.is_active,
+      });
+    }
+  }, [staff, reset]);
+
+  const selectedRoles = watch("role_codes") || [];
+
+  const updateMutation = useMutation({
+    mutationFn: async (values: StaffUpdateFormValues) => {
+      const token = await getToken();
+      if (!token) throw new Error("Unauthenticated");
+      return updateStaff(token, staffId, values);
+    },
+    onSuccess: () => {
+      router.push("/staff");
+    },
+    onError: (err: Error) => {
+      setErrorMsg(err.message || "Failed to update staff member.");
+    },
+  });
+
+  const handleRoleToggle = (code: string) => {
+    if (selectedRoles.includes(code)) {
+      setValue(
+        "role_codes",
+        selectedRoles.filter((c) => c !== code),
+        { shouldValidate: true, shouldDirty: true }
+      );
+    } else {
+      setValue("role_codes", [...selectedRoles, code], {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+  };
+
+  const onSubmit = (values: StaffUpdateFormValues) => {
+    setErrorMsg(null);
+    updateMutation.mutate(values);
+  };
+
+  if (!isAuthLoaded || isRbacLoading || isRolesLoading || isStaffLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="flex items-center gap-3 text-slate-400 font-medium">
+          <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+          Loading staff details...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 p-6 flex flex-col items-center justify-center">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full text-center space-y-4">
+          <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-center mx-auto text-rose-400">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-100">Access Restricted</h1>
+          <p className="text-sm text-slate-400">
+            Only users with the <strong className="text-orange-400">Admin</strong> role can edit staff members.
+          </p>
+          <Link
+            href="/staff"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold rounded-xl transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Staff Directory
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isStaffError) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 p-6 flex flex-col items-center justify-center">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full text-center space-y-4">
+          <AlertCircle className="w-10 h-10 text-rose-400 mx-auto" />
+          <h1 className="text-xl font-bold text-slate-100">Staff Member Not Found</h1>
+          <p className="text-sm text-slate-400">
+            {(staffError as Error)?.message || "Could not find the requested staff member."}
+          </p>
+          <Link
+            href="/staff"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold rounded-xl transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Staff Directory
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="border-b border-slate-800 pb-5">
+          <Link
+            href="/staff"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-200 mb-2 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Staff Directory
+          </Link>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50 flex items-center gap-3">
+            <Edit2 className="w-7 h-7 text-orange-500" /> Edit Staff Member
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Update employee details, contact info, or reassign system roles.
+          </p>
+        </div>
+
+        {/* Error Banner */}
+        {errorMsg && (
+          <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-center gap-3 text-rose-300 text-sm font-medium">
+            <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+            {errorMsg}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
+            <h2 className="text-base font-semibold text-slate-200 border-b border-slate-800 pb-3">
+              Personal & Contact Information
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  First Name <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  {...register("first_name")}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-orange-500"
+                />
+                {errors.first_name && (
+                  <p className="text-xs text-rose-400 mt-1">{errors.first_name.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Last Name <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  {...register("last_name")}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-orange-500"
+                />
+                {errors.last_name && (
+                  <p className="text-xs text-rose-400 mt-1">{errors.last_name.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Email Address <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="email"
+                  {...register("email")}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-orange-500"
+                />
+                {errors.email && (
+                  <p className="text-xs text-rose-400 mt-1">{errors.email.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Phone Number
+                </label>
+                <input
+                  type="text"
+                  {...register("phone")}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-orange-500"
+                />
+                {errors.phone && (
+                  <p className="text-xs text-rose-400 mt-1">{errors.phone.message}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Roles Selection */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <div className="border-b border-slate-800 pb-3">
+              <h2 className="text-base font-semibold text-slate-200">
+                Assign System Roles <span className="text-rose-400">*</span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Select one or more roles defining this employee&apos;s permissions.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {roles.map((role) => {
+                const isSelected = selectedRoles.includes(role.code);
+                return (
+                  <button
+                    type="button"
+                    key={role.code}
+                    onClick={() => handleRoleToggle(role.code)}
+                    className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all ${
+                      isSelected
+                        ? "bg-orange-500/10 border-orange-500/50 text-slate-100 shadow-sm"
+                        : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 ${
+                        isSelected
+                          ? "bg-orange-500 border-orange-500 text-white"
+                          : "border-slate-700"
+                      }`}
+                    >
+                      {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-xs text-slate-200 block">
+                        {role.name}
+                      </span>
+                      {role.description && (
+                        <span className="text-[11px] text-slate-500 block leading-tight mt-0.5">
+                          {role.description}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {errors.role_codes && (
+              <p className="text-xs text-rose-400">{errors.role_codes.message}</p>
+            )}
+          </div>
+
+          {/* Section: Account Status */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-200">Account Status</h3>
+              <p className="text-xs text-slate-400">
+                Active staff members can log in and perform authorized duties.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                {...register("is_active")}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+            </label>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Link
+              href="/staff"
+              className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-xl transition-colors"
+            >
+              Cancel
+            </Link>
+            <button
+              type="submit"
+              disabled={!isDirty || isSubmitting || updateMutation.isPending}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl shadow-lg shadow-orange-500/20 transition-all disabled:opacity-50"
+            >
+              {(isSubmitting || updateMutation.isPending) && (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              )}
+              Save Staff Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

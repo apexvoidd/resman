@@ -1,0 +1,26 @@
+{
+  "name": "smart-restaurant-system",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "lint:frontend": "cd frontend && npm run lint",
+    "format:frontend": "cd frontend && npx prettier --write .",
+    "lint:backend": "cd backend && ruff check .",
+    "format:backend": "cd backend && black . && ruff check --fix ."
+  },
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "lint-staged": "^15.2.0"
+  },
+  "lint-staged": {
+    "frontend/**/*.{js,jsx,ts,tsx}": [
+      "cd frontend && npx eslint --fix",
+      "cd frontend && npx prettier --write"
+    ],
+    "backend/**/*.py": [
+      "black",
+      "ruff check --fix"
+    ]
+  }
+}
