@@ -5,6 +5,7 @@ from app.api.v1.endpoints import (
     guest,
     health,
     menu,
+    order,
     root,
     settings,
     staff,
@@ -34,6 +35,10 @@ api_router.include_router(guest.router, prefix="/guest", tags=["Guest & Entrance
 
 # Menu & Category Management Endpoints
 api_router.include_router(menu.router)
+
+# Customer Cart & Ordering Endpoints
+api_router.include_router(order.router)
+
 
 
 

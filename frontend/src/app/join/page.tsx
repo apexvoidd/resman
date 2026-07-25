@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   cancelGuestReservation,
   fetchGuestStatus,
@@ -365,13 +366,12 @@ export default function JoinPage() {
               )}
 
               {isVerified && (
-                <button
-                  type="button"
-                  onClick={() => alert("Digital Menu feature will be available in next module!")}
-                  className="w-full rounded-xl bg-emerald-500 py-3.5 text-sm font-bold text-gray-950 hover:bg-emerald-400 transition"
+                <Link
+                  href="/join/menu"
+                  className="w-full text-center rounded-xl bg-emerald-500 py-3.5 text-sm font-bold text-gray-950 hover:bg-emerald-400 transition block shadow-lg shadow-emerald-500/10"
                 >
-                  📖 Browse Digital Menu
-                </button>
+                  📖 Browse Digital Menu & Place Order
+                </Link>
               )}
 
               <button
