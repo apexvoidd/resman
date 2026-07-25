@@ -5,7 +5,7 @@
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export interface GuestSessionInit {
-  session_token: str;
+  session_token: string;
   expires_at: string;
   is_active: boolean;
 }
