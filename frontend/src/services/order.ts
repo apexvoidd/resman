@@ -18,8 +18,16 @@ export interface OrderOut {
   id: string;
   order_number: string;
   status: string;
+  priority?: "normal" | "high" | "urgent";
+  estimated_prep_minutes?: number | null;
+  estimated_completion_at?: string | null;
+  elapsed_seconds?: number;
+  is_delayed?: boolean;
+  is_paused?: boolean;
+  paused_at?: string | null;
   table_id?: string | null;
   table_number?: string | null;
+  guest_count?: number | null;
   total_amount: number;
   tax_amount: number;
   discount_amount: number;

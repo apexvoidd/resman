@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -98,6 +98,15 @@ class GuestSession(BaseModel):
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, nullable=False, index=True
+    )
+    is_locked: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
+    bill_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    can_submit_review: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
     )
 
     # Relationships

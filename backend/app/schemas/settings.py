@@ -15,11 +15,11 @@ _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")  # HH:MM 24-hour
 
 
 def _validate_time(v: str | None, field_name: str) -> str | None:
-    if v is None:
-        return v
-    if not _TIME_RE.match(v):
+    if v is None or not v.strip():
+        return None
+    if not _TIME_RE.match(v.strip()):
         raise ValueError(f"{field_name} must be in HH:MM 24-hour format (e.g. '09:00')")
-    return v
+    return v.strip()
 
 
 # ── Combined response (restaurant + settings) ─────────────────────────────────

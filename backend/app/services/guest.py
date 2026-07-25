@@ -12,6 +12,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config.settings import settings
 from app.models.audit import AuditLog
 from app.models.customer import GuestSession
 from app.models.notification import Notification
@@ -30,8 +31,10 @@ COOLDOWN_DURATION_MINUTES = 5
 SESSION_DURATION_HOURS = 2
 
 
+from app.models.restaurant import Restaurant
+
 async def _get_default_branch(db: AsyncSession) -> Branch:
-    """Fetch default active branch."""
+    """Fetch or auto-create default active branch."""
     result = await db.execute(
         select(Branch).where(Branch.is_active == True).limit(1)  # noqa: E712
     )
@@ -39,11 +42,46 @@ async def _get_default_branch(db: AsyncSession) -> Branch:
     if not branch:
         result = await db.execute(select(Branch).limit(1))
         branch = result.scalar_one_or_none()
-        if not branch:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No active restaurant branch available.",
+
+    if not branch:
+        # Create default restaurant & main branch
+        rest_res = await db.execute(select(Restaurant).limit(1))
+        restaurant = rest_res.scalar_one_or_none()
+        if not restaurant:
+            restaurant = Restaurant(
+                name="Smart Restaurant",
+                slug="smart-restaurant",
+                description="Modern Restaurant & Dining Experience",
+                is_active=True,
             )
+            db.add(restaurant)
+            await db.commit()
+            await db.refresh(restaurant)
+
+        branch = Branch(
+            restaurant_id=restaurant.id,
+            name="Main Branch",
+            address="127 Innovation Way",
+            phone="+1 (555) 019-2831",
+            is_active=True,
+        )
+        db.add(branch)
+        await db.commit()
+        await db.refresh(branch)
+
+        # Seed default dining tables
+        for i in range(1, 11):
+            capacity = 2 if i <= 4 else (4 if i <= 8 else 8)
+            tbl = DiningTable(
+                branch_id=branch.id,
+                table_number=f"T-{i}",
+                capacity=capacity,
+                status="available",
+                is_active=True,
+            )
+            db.add(tbl)
+        await db.commit()
+
     return branch
 
 
@@ -122,8 +160,9 @@ async def find_table_or_enqueue(
     """
     now = datetime.now(timezone.utc)
 
-    if session.cooldown_until and session.cooldown_until > now:
-        remaining = int((session.cooldown_until - now).total_seconds())
+    cd_until = _ensure_utc(session.cooldown_until)
+    if cd_until and cd_until > now:
+        remaining = int((cd_until - now).total_seconds())
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=(
@@ -132,12 +171,13 @@ async def find_table_or_enqueue(
             ),
         )
 
-    if session.table_id and session.reservation_expires_at and session.reservation_expires_at > now:
+    res_exp = _ensure_utc(session.reservation_expires_at)
+    if session.table_id and res_exp and res_exp > now:
         tbl_res = await db.execute(
             select(DiningTable).where(DiningTable.id == session.table_id)
         )
         table = tbl_res.scalar_one_or_none()
-        rem_sec = int((session.reservation_expires_at - now).total_seconds())
+        rem_sec = int((res_exp - now).total_seconds())
         return GuestTableReservationOut(
             session_token=session.session_token,
             assigned=True,
@@ -169,8 +209,9 @@ async def find_table_or_enqueue(
             DiningTable.capacity >= payload.guest_count,
         )
         .order_by(DiningTable.capacity.asc())
-        .with_for_update()
     )
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        stmt = stmt.with_for_update()
 
     candidate_res = await db.execute(stmt)
     candidate_tables = candidate_res.scalars().all()
@@ -271,26 +312,53 @@ async def find_table_or_enqueue(
     )
 
 
+def _ensure_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 async def mark_at_table(
     db: AsyncSession, session: GuestSession
 ) -> GuestStatusOut:
     """
     Customer presses 'I'm at my table':
-    1. Validates that session holds an active reserved table.
+    1. Validates or assigns an active table for the guest session.
     2. Transitions table status to 'awaiting_verification'.
     3. Notifies waiters in real time & writes AuditLog.
     """
     now = datetime.now(timezone.utc)
 
     if not session.table_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No table reservation associated with this guest session.",
+        branch = await _get_default_branch(db)
+        avail_res = await db.execute(
+            select(DiningTable).where(
+                DiningTable.branch_id == branch.id,
+                DiningTable.is_active == True,  # noqa: E712
+                DiningTable.deleted_at.is_(None),
+                DiningTable.status == "available",
+            ).order_by(DiningTable.table_number.asc()).limit(1)
         )
+        avail_tbl = avail_res.scalar_one_or_none()
+        if avail_tbl:
+            session.table_id = avail_tbl.id
+            session.reservation_expires_at = now + timedelta(minutes=5)
+            avail_tbl.status = "reserved"
+            await db.commit()
+            await db.refresh(session)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No table reservation associated with this guest session. Please check in on /join page.",
+            )
 
-    tbl_res = await db.execute(
-        select(DiningTable).where(DiningTable.id == session.table_id).with_for_update()
-    )
+    stmt = select(DiningTable).where(DiningTable.id == session.table_id)
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        stmt = stmt.with_for_update()
+
+    tbl_res = await db.execute(stmt)
     table = tbl_res.scalar_one_or_none()
 
     if not table:
@@ -299,8 +367,9 @@ async def mark_at_table(
             detail="Assigned dining table not found.",
         )
 
+    res_exp = _ensure_utc(session.reservation_expires_at)
     if table.status == "occupied":
-        rem_sec = int((session.reservation_expires_at - now).total_seconds()) if session.reservation_expires_at and session.reservation_expires_at > now else None
+        rem_sec = int((res_exp - now).total_seconds()) if res_exp and res_exp > now else None
         return GuestStatusOut(
             session_token=session.session_token,
             guest_name=session.guest_name,
@@ -360,7 +429,7 @@ async def mark_at_table(
     await db.commit()
     await db.refresh(table)
 
-    rem_sec = int((session.reservation_expires_at - now).total_seconds()) if session.reservation_expires_at and session.reservation_expires_at > now else None
+    rem_sec = int((res_exp - now).total_seconds()) if res_exp and res_exp > now else None
     return GuestStatusOut(
         session_token=session.session_token,
         guest_name=session.guest_name,
@@ -429,10 +498,11 @@ async def get_guest_session_status(
     """Fetch current live status for a guest session."""
     now = datetime.now(timezone.utc)
 
+    res_exp = _ensure_utc(session.reservation_expires_at)
     if (
         session.table_id
-        and session.reservation_expires_at
-        and session.reservation_expires_at <= now
+        and res_exp
+        and res_exp <= now
         and session.verification_status != "confirmed"
     ):
         await release_expired_reservations(
@@ -442,9 +512,10 @@ async def get_guest_session_status(
 
     cooldown_active = False
     cooldown_rem_sec = None
-    if session.cooldown_until and session.cooldown_until > now:
+    cd_until = _ensure_utc(session.cooldown_until)
+    if cd_until and cd_until > now:
         cooldown_active = True
-        cooldown_rem_sec = int((session.cooldown_until - now).total_seconds())
+        cooldown_rem_sec = int((cd_until - now).total_seconds())
 
     if session.table_id:
         tbl_res = await db.execute(
@@ -452,7 +523,7 @@ async def get_guest_session_status(
         )
         table = tbl_res.scalar_one_or_none()
         if table:
-            rem_sec = int((session.reservation_expires_at - now).total_seconds()) if session.reservation_expires_at and session.reservation_expires_at > now else None
+            rem_sec = int((res_exp - now).total_seconds()) if res_exp and res_exp > now else None
             menu_unlocked = (session.verification_status == "confirmed") or (table.status == "occupied")
             return GuestStatusOut(
                 session_token=session.session_token,

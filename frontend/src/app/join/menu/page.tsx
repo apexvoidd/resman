@@ -6,12 +6,37 @@ import { fetchGuestStatus, GuestStatusResponse } from "@/services/guest";
 import { Category, fetchCategories, fetchMenuItems, MenuItem } from "@/services/menu";
 import { cancelOrder, fetchSessionOrders, OrderOut, placeOrder, updateOrder } from "@/services/order";
 import { useCartStore } from "@/store/use-cart-store";
+import { fetchSessionBill, requestBill, BillData } from "@/services/billing";
 
 export default function CustomerSeatedMenuPage() {
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionStatus, setSessionStatus] = useState<GuestStatusResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [billMsg, setBillMsg] = useState<string | null>(null);
+  const [activeBill, setActiveBill] = useState<BillData | null>(null);
+
+  const checkBill = async (st: string) => {
+    try {
+      const b = await fetchSessionBill(st);
+      if (b) setActiveBill(b);
+    } catch {
+      // silent catch
+    }
+  };
+
+  const handleRequestBill = async () => {
+    if (!sessionToken) return;
+    try {
+      setErrorMsg(null);
+      const res = await requestBill(sessionToken);
+      setBillMsg(res.message);
+      await checkBill(sessionToken);
+    } catch (err: unknown) {
+      const e = err as Error;
+      setErrorMsg(e.message || "Failed to request bill.");
+    }
+  };
 
   // Menu Data & Filters
   const [categories, setCategories] = useState<Category[]>([]);
@@ -75,6 +100,20 @@ export default function CustomerSeatedMenuPage() {
 
     init();
   }, []);
+
+  useEffect(() => {
+    if (!sessionToken) return;
+
+    checkBill(sessionToken);
+    loadSessionOrders();
+
+    const interval = setInterval(() => {
+      checkBill(sessionToken);
+      loadSessionOrders();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [sessionToken]);
 
   // Filter items
   const filteredItems = items.filter((dish) => {
@@ -196,25 +235,49 @@ export default function CustomerSeatedMenuPage() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              loadSessionOrders();
-              setIsOrdersOpen(true);
-            }}
-            className="flex items-center gap-2 rounded-xl border border-gray-800 bg-gray-900 px-4 py-2 text-xs font-semibold text-gray-200 hover:bg-gray-800 transition"
-          >
-            📋 My Orders
-            {sessionOrders.length > 0 && (
-              <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-gray-950">
-                {sessionOrders.length}
-              </span>
+          <div className="flex items-center gap-2">
+            {activeBill ? (
+              <Link
+                href={`/billing/${activeBill.id}`}
+                className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 transition"
+              >
+                💳 Pay Bill (₹{activeBill.grand_total.toFixed(2)})
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={handleRequestBill}
+                className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-bold text-amber-300 hover:bg-amber-500/20 transition"
+              >
+                🧾 Request Bill
+              </button>
             )}
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                loadSessionOrders();
+                setIsOrdersOpen(true);
+              }}
+              className="flex items-center gap-2 rounded-xl border border-gray-800 bg-gray-900 px-4 py-2 text-xs font-semibold text-gray-200 hover:bg-gray-800 transition"
+            >
+              📋 My Orders
+              {sessionOrders.length > 0 && (
+                <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-gray-950">
+                  {sessionOrders.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+        {billMsg && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-semibold text-amber-300 flex items-center justify-between">
+            <span>{billMsg}</span>
+            <button onClick={() => setBillMsg(null)} className="text-xs text-amber-400 hover:underline">Dismiss</button>
+          </div>
+        )}
         {errorMsg && (
           <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
             {errorMsg}
@@ -498,18 +561,55 @@ export default function CustomerSeatedMenuPage() {
                         <span className="font-mono text-xs font-bold text-amber-400">{ord.order_number}</span>
                         <p className="text-[10px] text-gray-500">{new Date(ord.created_at).toLocaleTimeString()}</p>
                       </div>
-                      <span
-                        className={`rounded-full px-3 py-1 text-[10px] font-bold ring-1 ${
-                          ord.status === "pending"
-                            ? "bg-amber-500/10 text-amber-400 ring-amber-500/30 animate-pulse"
-                            : ord.status === "cancelled"
-                            ? "bg-red-500/10 text-red-400 ring-red-500/30"
-                            : "bg-blue-500/10 text-blue-400 ring-blue-500/30"
-                        }`}
-                      >
-                        {ord.status_message}
-                      </span>
+                      <div className="text-right">
+                        <span
+                          className={`inline-block rounded-full px-3 py-1 text-[10px] font-bold ring-1 ${
+                            ord.status === "pending"
+                              ? "bg-amber-500/10 text-amber-400 ring-amber-500/30 animate-pulse"
+                              : ord.status === "cancelled"
+                              ? "bg-red-500/10 text-red-400 ring-red-500/30"
+                              : ord.status === "ready"
+                              ? "bg-emerald-500/20 text-emerald-300 ring-emerald-500/40 animate-bounce"
+                              : "bg-blue-500/10 text-blue-400 ring-blue-500/30"
+                          }`}
+                        >
+                          {ord.status_message}
+                        </span>
+                        {ord.estimated_prep_minutes && ord.status !== "completed" && ord.status !== "cancelled" && (
+                          <p className="text-[10px] text-emerald-400 font-semibold mt-1">
+                            ⏱️ Est. Prep: {ord.estimated_prep_minutes} mins
+                          </p>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Live KDS Progress Bar */}
+                    {ord.status !== "cancelled" && (
+                      <div className="space-y-1">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-800">
+                          <div
+                            className="h-full bg-gradient-to-r from-amber-500 via-blue-500 to-emerald-500 transition-all duration-1000"
+                            style={{
+                              width:
+                                ord.status === "pending"
+                                  ? "15%"
+                                  : ord.status === "accepted"
+                                  ? "40%"
+                                  : ord.status === "preparing"
+                                  ? "75%"
+                                  : ord.status === "ready" || ord.status === "completed"
+                                  ? "100%"
+                                  : "0%",
+                            }}
+                          />
+                        </div>
+                        {ord.is_delayed && (
+                          <p className="text-[10px] text-red-400 font-bold animate-pulse">
+                            ⚠️ Kitchen is taking extra care — prep time slightly extended
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="space-y-1.5 text-xs text-gray-300">
                       {ord.items.map((item) => (
@@ -543,6 +643,33 @@ export default function CustomerSeatedMenuPage() {
                 ))}
               </div>
             )}
+
+            {/* Modal Footer with Bill Action */}
+            <div className="border-t border-gray-800 bg-gray-950 p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400">Session Total ({sessionOrders.length} Orders):</p>
+                <p className="text-sm font-bold text-emerald-400">
+                  ₹{sessionOrders.reduce((sum, o) => sum + (o.status !== "cancelled" ? o.final_amount : 0), 0).toFixed(2)}
+                </p>
+              </div>
+
+              {activeBill ? (
+                <Link
+                  href={`/billing/${activeBill.id}`}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center gap-2"
+                >
+                  💳 Pay Bill (₹{activeBill.grand_total.toFixed(2)})
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRequestBill}
+                  className="px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs rounded-xl transition flex items-center gap-2"
+                >
+                  🧾 Request Final Bill
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

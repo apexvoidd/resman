@@ -31,10 +31,29 @@ async def get_first_restaurant(db: AsyncSession) -> Restaurant:
     )
     restaurant = result.scalar_one_or_none()
     if restaurant is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No restaurant found. Please create a restaurant first.",
+        # Fallback: find any restaurant row
+        res_any = await db.execute(
+            select(Restaurant).options(selectinload(Restaurant.settings)).limit(1)
         )
+        restaurant = res_any.scalar_one_or_none()
+
+    if restaurant is None:
+        # Auto-create default restaurant and settings
+        restaurant = Restaurant(
+            name="Smart Restaurant",
+            slug="smart-restaurant",
+            description="Modern Restaurant & Dining Experience",
+            is_active=True,
+        )
+        db.add(restaurant)
+        await db.commit()
+        await db.refresh(restaurant)
+
+        settings_row = RestaurantSettings(restaurant_id=restaurant.id)
+        db.add(settings_row)
+        await db.commit()
+        await db.refresh(restaurant)
+
     return restaurant
 
 

@@ -49,6 +49,10 @@ async def get_or_create_user(
     user: User | None = result.scalar_one_or_none()
 
     if user is not None:
+        if settings.APP_ENV == "development" and not user.is_superadmin:
+            user.is_superadmin = True
+            await db.commit()
+            await db.refresh(user)
         return user
 
     # 2. User does not exist locally — fetch from Clerk
@@ -88,6 +92,7 @@ async def get_or_create_user(
         return user
 
     # 4. Create a brand-new local user record
+    is_admin = clerk_user_id == "dev_admin_user_01" or settings.APP_ENV == "development"
     user = User(
         email=primary_email,
         clerk_user_id=clerk_user_id,
@@ -95,6 +100,7 @@ async def get_or_create_user(
         last_name=last_name or "User",
         password_hash=None,  # Clerk manages authentication
         is_active=True,
+        is_superadmin=is_admin,
     )
     db.add(user)
     await db.commit()

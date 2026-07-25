@@ -11,6 +11,11 @@ import {
   verifyCustomerArrival,
 } from "@/services/table";
 
+import Link from "next/link";
+import { fetchWaiterNotifications, generateBill, WaiterNotification } from "@/services/billing";
+import { fetchKDSOrders } from "@/services/kds";
+import { OrderOut } from "@/services/order";
+
 export default function WaiterDashboardPage() {
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
@@ -18,9 +23,17 @@ export default function WaiterDashboardPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [verifications, setVerifications] = useState<PendingVerificationTable[]>([]);
   const [tables, setTables] = useState<DiningTable[]>([]);
+  const [activeOrders, setActiveOrders] = useState<OrderOut[]>([]);
+  const [notifications, setNotifications] = useState<WaiterNotification[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Discount & Tip state for bill generation
+  const [discountAmt, setDiscountAmt] = useState<number>(0);
+  const [tipAmt, setTipAmt] = useState<number>(0);
+  const [generatedBillId, setGeneratedBillId] = useState<string | null>(null);
 
   // Reject modal state
   const [rejectingTableId, setRejectingTableId] = useState<string | null>(null);
@@ -33,19 +46,41 @@ export default function WaiterDashboardPage() {
       const token = await getToken();
       if (!token) return;
 
-      const [pendingRes, tableListRes] = await Promise.all([
+      const [pendingRes, tableListRes, notifsRes, ordersRes] = await Promise.allSettled([
         fetchPendingVerifications(token),
         fetchTableList(token, { page_size: 100 }),
+        fetchWaiterNotifications(token),
+        fetchKDSOrders(token, { status: "all" }),
       ]);
 
-      setVerifications(pendingRes);
-      setTables(tableListRes.items);
+      if (pendingRes.status === "fulfilled") setVerifications(pendingRes.value);
+      if (tableListRes.status === "fulfilled") setTables(tableListRes.value.items);
+      if (notifsRes.status === "fulfilled") setNotifications(notifsRes.value);
+      if (ordersRes.status === "fulfilled") setActiveOrders(ordersRes.value);
       setErrorMsg(null);
     } catch (err: unknown) {
       const e = err as Error;
       setErrorMsg(e.message || "Failed to load waiter dashboard data.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateBill = async (orderId: string) => {
+    try {
+      setActionLoading(orderId);
+      const token = await getToken();
+      if (!token) return;
+
+      const bill = await generateBill(token, orderId, discountAmt, tipAmt);
+      setGeneratedBillId(bill.id);
+      setSuccessMsg(`Bill ${bill.bill_number} generated successfully! Session locked for Table ${bill.table_number || ''}.`);
+      await loadData();
+    } catch (err: unknown) {
+      const e = err as Error;
+      setErrorMsg(e.message || "Failed to generate bill.");
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -168,6 +203,28 @@ export default function WaiterDashboardPage() {
           <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
             {errorMsg}
           </div>
+        )}
+
+        {/* REAL-TIME NOTIFICATIONS & BILL REQUESTS SECTION */}
+        {notifications.length > 0 && (
+          <section className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 space-y-3">
+            <h2 className="text-base font-bold text-amber-300 flex items-center gap-2">
+              <span>🔔 Real-Time Notifications & Bill Requests</span>
+              <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-black text-gray-950">
+                {notifications.length}
+              </span>
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {notifications.map((n) => (
+                <div key={n.id} className="bg-gray-900 border border-amber-500/20 p-4 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-amber-400">{n.title}</span>
+                  </div>
+                  <p className="text-xs text-gray-300">{n.message}</p>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* SECTION 1: PENDING VERIFICATION REQUESTS */}
@@ -301,6 +358,82 @@ export default function WaiterDashboardPage() {
               );
             })}
           </div>
+        </section>
+
+        {/* SECTION 3: ACTIVE TABLE ORDERS & BILL GENERATION */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-white">🧾 Active Orders & Bill Generation</h2>
+              <p className="text-xs text-gray-400">Review seated table orders and generate itemized final bills</p>
+            </div>
+            {generatedBillId && (
+              <Link
+                href={`/billing/${generatedBillId}`}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/20"
+              >
+                💳 Open Generated Bill
+              </Link>
+            )}
+          </div>
+
+          {activeOrders.length === 0 ? (
+            <div className="rounded-2xl border border-gray-800 bg-gray-900/50 p-6 text-center text-xs text-gray-500">
+              No active table orders found to generate bill.
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {activeOrders.map((ord) => (
+                <div key={ord.id} className="rounded-2xl border border-gray-800 bg-gray-900 p-5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                    <span className="text-xs font-bold text-amber-400 uppercase">
+                      Table {ord.table_number || "N/A"}
+                    </span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md">
+                      {ord.status}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 text-xs text-slate-300">
+                    <p className="font-semibold text-white">Order {ord.order_number}</p>
+                    <p className="text-slate-400">{ord.items.length} Items | Total: <strong className="text-emerald-400">₹{ord.final_amount.toFixed(2)}</strong></p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <label className="text-slate-500 block">Discount (₹):</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={discountAmt}
+                        onChange={(e) => setDiscountAmt(parseFloat(e.target.value) || 0)}
+                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2 py-1 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-500 block">Tip (₹):</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={tipAmt}
+                        onChange={(e) => setTipAmt(parseFloat(e.target.value) || 0)}
+                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2 py-1 text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateBill(ord.id)}
+                    disabled={actionLoading === ord.id}
+                    className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-gray-950 font-extrabold rounded-xl text-xs transition disabled:opacity-50"
+                  >
+                    {actionLoading === ord.id ? "Generating Bill..." : "🧾 Generate Final Bill"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </main>
 

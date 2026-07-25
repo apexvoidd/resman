@@ -224,11 +224,8 @@ async def upload_menu_image(
             detail="Only JPEG, PNG, WEBP, and AVIF image files are allowed.",
         )
 
-    file_bytes = await file.read()
     image_url = await upload_file_to_r2(
-        file_bytes=file_bytes,
-        filename=file.filename or "dish.jpg",
-        content_type=file.content_type,
+        file=file,
         folder="menu-items",
     )
     return {"image_url": image_url}

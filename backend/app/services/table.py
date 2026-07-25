@@ -10,6 +10,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config.settings import settings
+
 from app.models.audit import AuditLog
 from app.models.customer import GuestSession
 from app.models.notification import Notification
@@ -287,6 +289,14 @@ async def delete_table(db: AsyncSession, table_id: uuid.UUID) -> None:
     await db.commit()
 
 
+def _ensure_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 async def get_pending_verifications(db: AsyncSession) -> list[PendingVerificationTable]:
     """Fetch all tables currently awaiting waiter verification."""
     now = datetime.now(timezone.utc)
@@ -307,8 +317,9 @@ async def get_pending_verifications(db: AsyncSession) -> list[PendingVerificatio
     out: list[PendingVerificationTable] = []
     for tbl, sess in rows:
         elapsed = 0
-        if sess.verification_requested_at:
-            elapsed = int((now - sess.verification_requested_at).total_seconds())
+        req_at = _ensure_utc(sess.verification_requested_at)
+        if req_at:
+            elapsed = int((now - req_at).total_seconds())
 
         out.append(
             PendingVerificationTable(
@@ -324,7 +335,10 @@ async def get_pending_verifications(db: AsyncSession) -> list[PendingVerificatio
         )
 
     # Trigger automatic 3-minute no-order check while querying
-    await check_no_order_reminders(db)
+    try:
+        await check_no_order_reminders(db)
+    except Exception as exc:
+        logger.warning("Skipped no-order reminder check: %s", exc)
 
     return out
 
@@ -342,11 +356,13 @@ async def verify_customer_arrival(
     """
     now = datetime.now(timezone.utc)
 
-    result = await db.execute(
-        select(DiningTable).where(
-            DiningTable.id == table_id, DiningTable.deleted_at.is_(None)
-        ).with_for_update()
+    stmt = select(DiningTable).where(
+        DiningTable.id == table_id, DiningTable.deleted_at.is_(None)
     )
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        stmt = stmt.with_for_update()
+
+    result = await db.execute(stmt)
     table = result.scalar_one_or_none()
     if table is None:
         raise HTTPException(
@@ -385,11 +401,12 @@ async def verify_customer_arrival(
                 new_value={"status": "occupied", "waiter_user_id": str(current_user.id)},
             )
         )
+        staff_name = getattr(current_user, "full_name", getattr(current_user, "email", "Staff"))
         db.add(
             Notification(
                 recipient_type="manager",
                 title=f"Table {table.table_number} Seated",
-                message=f"Staff member {current_user.full_name or current_user.email} confirmed guest arrival for Table {table.table_number}.",
+                message=f"Staff member {staff_name} confirmed guest arrival for Table {table.table_number}.",
                 notification_type="arrival_confirmed",
                 status="unread",
                 payload_json={"table_id": str(table.id), "table_number": table.table_number},

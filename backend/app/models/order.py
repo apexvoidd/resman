@@ -1,7 +1,8 @@
+from datetime import datetime
 import uuid
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -59,7 +60,18 @@ class Order(BaseModel, SoftDeleteMixin):
     )  # dine_in, takeaway, delivery
     status: Mapped[str] = mapped_column(
         String(50), default="pending", nullable=False, index=True
-    )  # pending, confirmed, preparing, ready, served, completed, cancelled
+    )  # pending, accepted, preparing, ready, served, completed, cancelled, paused
+    priority: Mapped[str] = mapped_column(
+        String(20), default="normal", nullable=False, index=True
+    )  # normal, high, urgent
+    estimated_prep_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    estimated_completion_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    is_paused: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    paused_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     total_amount: Mapped[float] = mapped_column(
         Numeric(10, 2), default=0.0, nullable=False
     )

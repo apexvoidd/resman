@@ -34,6 +34,11 @@ class User(BaseModel, SoftDeleteMixin):
         "UserRole", back_populates="user", cascade="all, delete-orphan"
     )
 
+    @property
+    def full_name(self) -> str:
+        name = f"{self.first_name or ''} {self.last_name or ''}".strip()
+        return name if name else (self.email or "Staff Member")
+
 
 class Role(BaseModel):
     """RBAC Role definition."""

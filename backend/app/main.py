@@ -12,14 +12,20 @@ from app.middleware.rate_limit import setup_rate_limiter
 from app.middleware.security_headers import SecurityHeadersMiddleware
 
 # Setup structured logging
+from app.db.session import init_db
+
 setup_logging()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup tasks (e.g. cache connection, monitoring initialization)
+    # Startup tasks
+    try:
+        await init_db()
+    except Exception as e:
+        print(f"Database initialization notice: {e}")
     yield
-    # Shutdown tasks (e.g. database pool cleanup)
+    # Shutdown tasks
 
 
 def create_app() -> FastAPI:
@@ -53,6 +59,13 @@ def create_app() -> FastAPI:
     # Include Routers (Available at root / and /health as well as /api/v1)
     app.include_router(api_router)
     app.include_router(api_router, prefix=settings.API_V1_STR)
+
+    # Mount static files for local upload fallback
+    from pathlib import Path
+    from fastapi.staticfiles import StaticFiles
+    upload_dir = Path("uploads")
+    upload_dir.mkdir(exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
     return app
 

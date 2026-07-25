@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,7 +43,7 @@ class Ingredient(BaseModel, SoftDeleteMixin):
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     unit_of_measure: Mapped[str] = mapped_column(
         String(50), nullable=False
-    )  # kg, grams, liters, pcs
+    )  # kg, g, L, ml, pcs
     current_stock: Mapped[float] = mapped_column(
         Numeric(12, 3), default=0.0, nullable=False
     )
@@ -56,6 +56,9 @@ class Ingredient(BaseModel, SoftDeleteMixin):
     unit_cost: Mapped[float] = mapped_column(
         Numeric(10, 2), default=0.0, nullable=False
     )
+    supplier: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    version_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
     # Relationships
     category: Mapped[Optional["IngredientCategory"]] = relationship(
@@ -141,15 +144,23 @@ class PurchaseHistory(BaseModel):
     quantity: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False)
     unit_cost: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     total_cost: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    invoice_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
     purchase_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recorded_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Relationships
     ingredient: Mapped["Ingredient"] = relationship(
         "Ingredient", back_populates="purchases"
     )
+    recorded_by: Mapped[Optional["User"]] = relationship("User")
 
 
 class StockHistory(BaseModel):
@@ -163,18 +174,35 @@ class StockHistory(BaseModel):
         nullable=False,
         index=True,
     )
+    previous_quantity: Mapped[float] = mapped_column(
+        Numeric(12, 3), default=0.0, nullable=False
+    )
+    new_quantity: Mapped[float] = mapped_column(
+        Numeric(12, 3), default=0.0, nullable=False
+    )
     change_amount: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False)
-    reason: Mapped[str] = mapped_column(
-        String(100), nullable=False, index=True
-    )  # purchase, usage, adjustment, waste
+    action_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True
+    )  # restock, adjustment_increase, adjustment_decrease, waste, create, edit
+    reason: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    invoice_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    supplier: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     reference_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
+    )
+    recorded_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # Relationships
     ingredient: Mapped["Ingredient"] = relationship(
         "Ingredient", back_populates="stock_changes"
     )
+    recorded_by: Mapped[Optional["User"]] = relationship("User")
 
 
 class WasteRecord(BaseModel):
@@ -197,6 +225,7 @@ class WasteRecord(BaseModel):
     quantity: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False)
     reason: Mapped[str] = mapped_column(String(255), nullable=False)
     cost_impact: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     recorded_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -215,3 +244,4 @@ class WasteRecord(BaseModel):
         "MenuItem", back_populates="waste_records"
     )
     recorded_by: Mapped[Optional["User"]] = relationship("User")
+

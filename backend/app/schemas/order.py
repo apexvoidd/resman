@@ -1,10 +1,10 @@
 """
-Pydantic schemas for Customer Cart and Order placement.
+Pydantic schemas for Customer Cart, Order Placement, and Kitchen Display System (KDS).
 """
 
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -55,8 +55,16 @@ class OrderOut(BaseModel):
     id: uuid.UUID
     order_number: str
     status: str
+    priority: str = "normal"
+    estimated_prep_minutes: int | None = None
+    estimated_completion_at: datetime | None = None
+    elapsed_seconds: int = 0
+    is_delayed: bool = False
+    is_paused: bool = False
+    paused_at: datetime | None = None
     table_id: uuid.UUID | None = None
     table_number: str | None = None
+    guest_count: int | None = None
     total_amount: float
     tax_amount: float
     discount_amount: float
@@ -68,3 +76,21 @@ class OrderOut(BaseModel):
     status_message: str
     created_at: datetime
     updated_at: datetime
+
+
+# --- KDS SCHEMAS ---
+
+class AcceptOrderInput(BaseModel):
+    estimated_prep_minutes: int = Field(..., ge=1, le=180, description="Estimated prep time in minutes")
+
+
+class UpdatePrepTimeInput(BaseModel):
+    estimated_prep_minutes: int = Field(..., ge=1, le=180)
+
+
+class UpdatePriorityInput(BaseModel):
+    priority: Literal["normal", "high", "urgent"]
+
+
+class PauseOrderInput(BaseModel):
+    reason: Annotated[str | None, Field(max_length=255)] = None

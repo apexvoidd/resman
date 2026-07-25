@@ -115,6 +115,18 @@ class Payment(BaseModel):
     transaction_reference: Mapped[str | None] = mapped_column(
         String(255), unique=True, nullable=True, index=True
     )
+    razorpay_order_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
+    razorpay_signature: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )
+    cashier_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     status: Mapped[str] = mapped_column(
         String(50), default="pending", nullable=False, index=True

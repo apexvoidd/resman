@@ -166,7 +166,7 @@ async def update_table(
 async def toggle_table_status(
     table_id: uuid.UUID,
     payload: TableStatusToggle,
-    _: User = Depends(require_role(["admin", "manager"])),
+    _: User = Depends(require_role(["waiter", "cashier", "kitchen_staff", "admin", "manager"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Update active state or operational status for a dining table."""

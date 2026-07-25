@@ -34,22 +34,32 @@ def _is_r2_configured() -> bool:
     )
 
 
-async def upload_logo(file: UploadFile) -> str:
-    """
-    Validate and upload a logo image to Cloudflare R2.
+from pathlib import Path
 
-    Returns the public URL of the uploaded object.
-    Raises HTTP 400 on validation errors, HTTP 503 when R2 is not configured.
+async def upload_file_to_r2(file: UploadFile, folder: str = "uploads") -> str:
+    """
+    Validate and upload an image file to Cloudflare R2 under a specific folder.
+    Falls back to local file storage when R2 is not configured.
     """
     if not _is_r2_configured():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "File storage (Cloudflare R2) is not configured. "
-                "Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, "
-                "and R2_BUCKET_NAME in your environment."
-            ),
-        )
+        # Local file storage fallback
+        upload_dir = Path("uploads") / folder
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        content_type = file.content_type or "image/jpeg"
+        ext = mimetypes.guess_extension(content_type) or ".jpg"
+        ext = ext.replace(".jpe", ".jpg")
+        filename = f"{uuid.uuid4().hex}{ext}"
+        file_path = upload_dir / filename
+
+        data = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(data)
+
+        host = f"http://localhost:{settings.PORT}" if settings.PORT else "http://localhost:8000"
+        public_url = f"{host}/uploads/{folder}/{filename}"
+        logger.info("Saved image locally to %s -> %s", file_path, public_url)
+        return public_url
 
     # ── Validate content type ─────────────────────────────────────────────────
     content_type = file.content_type or ""
@@ -64,13 +74,13 @@ async def upload_logo(file: UploadFile) -> str:
     if len(data) > _MAX_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Logo file must be ≤ {_MAX_SIZE_BYTES // (1024 * 1024)} MB.",
+            detail=f"File must be ≤ {_MAX_SIZE_BYTES // (1024 * 1024)} MB.",
         )
 
     # ── Build a unique object key ─────────────────────────────────────────────
     ext = mimetypes.guess_extension(content_type) or ".jpg"
     ext = ext.replace(".jpe", ".jpg")  # normalize .jpe → .jpg
-    object_key = f"logos/{uuid.uuid4().hex}{ext}"
+    object_key = f"{folder}/{uuid.uuid4().hex}{ext}"
 
     # ── Upload via aioboto3 ───────────────────────────────────────────────────
     session = aioboto3.Session()
@@ -94,7 +104,7 @@ async def upload_logo(file: UploadFile) -> str:
         logger.error("R2 upload failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Logo upload failed. Please try again later.",
+            detail="File upload failed. Please try again later.",
         ) from exc
 
     # ── Return public URL ─────────────────────────────────────────────────────
@@ -104,5 +114,10 @@ async def upload_logo(file: UploadFile) -> str:
         # Fallback to direct R2 URL (requires bucket public access)
         public_url = f"{_r2_endpoint()}/{settings.R2_BUCKET_NAME}/{object_key}"
 
-    logger.info("Logo uploaded: %s", public_url)
+    logger.info("File uploaded: %s", public_url)
     return public_url
+
+
+async def upload_logo(file: UploadFile) -> str:
+    """Upload logo image to Cloudflare R2."""
+    return await upload_file_to_r2(file, folder="logos")

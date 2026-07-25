@@ -62,14 +62,49 @@ def _build_order_out(order: Order) -> OrderOut:
             )
         )
 
-    table_num = order.table.table_number if order.table else None
+    table_num = None
+    try:
+        if order.table:
+            table_num = order.table.table_number
+    except Exception:
+        pass
+
+    guest_cnt = None
+    try:
+        if order.guest_session:
+            guest_cnt = order.guest_session.guest_count
+    except Exception:
+        pass
+
+    now = datetime.now(timezone.utc)
+    created_at_dt = order.created_at
+    if created_at_dt.tzinfo is None:
+        created_at_dt = created_at_dt.replace(tzinfo=timezone.utc)
+
+    elapsed_sec = int((now - created_at_dt).total_seconds()) if created_at_dt else 0
+
+    is_delayed = False
+    if order.estimated_completion_at:
+        est_comp = order.estimated_completion_at
+        if est_comp.tzinfo is None:
+            est_comp = est_comp.replace(tzinfo=timezone.utc)
+        if now > est_comp and order.status not in ["completed", "served", "cancelled"]:
+            is_delayed = True
 
     return OrderOut(
         id=order.id,
         order_number=order.order_number,
         status=order.status,
+        priority=order.priority,
+        estimated_prep_minutes=order.estimated_prep_minutes,
+        estimated_completion_at=order.estimated_completion_at,
+        elapsed_seconds=elapsed_sec,
+        is_delayed=is_delayed,
+        is_paused=order.is_paused,
+        paused_at=order.paused_at,
         table_id=order.table_id,
         table_number=table_num,
+        guest_count=guest_cnt,
         total_amount=float(order.total_amount),
         tax_amount=float(order.tax_amount),
         discount_amount=float(order.discount_amount),
@@ -101,6 +136,12 @@ async def create_customer_order(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Active dining session with assigned table required to place orders.",
+        )
+
+    if getattr(session, "is_locked", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Dining session is locked for billing. No new orders permitted.",
         )
 
     # Check table status / verification status
