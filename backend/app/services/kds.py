@@ -401,23 +401,41 @@ async def get_waiter_active_orders(
     result = await db.execute(query)
     orders = result.scalars().all()
 
-    # For completed orders, check if bill is paid — exclude if paid
+    # For completed orders, check if bill is paid — exclude if paid or session closed
     filtered = []
     for order in orders:
         if order.status != "completed":
             filtered.append(order)
             continue
-        # Check bill status
-        bill_res = await db.execute(
-            select(Bill).where(
-                Bill.order_id == order.id,
-                Bill.deleted_at.is_(None),
+
+        # If the order's guest session is inactive/ended, it is already paid and completed!
+        if order.guest_session and not order.guest_session.is_active:
+            continue
+
+        # Check if ANY bill associated with this order or its guest session is paid
+        if order.guest_session_id:
+            sess_bills_res = await db.execute(
+                select(Bill).where(
+                    Bill.order_id.in_(
+                        select(Order.id).where(Order.guest_session_id == order.guest_session_id)
+                    ),
+                    Bill.deleted_at.is_(None),
+                )
             )
-        )
-        bill = bill_res.scalar_one_or_none()
-        # Include completed order only if bill doesn't exist or is not paid
-        if bill is None or bill.status != "paid":
-            filtered.append(order)
-        # If bill is paid — exclude from waiter dashboard
+            sess_bills = sess_bills_res.scalars().all()
+            if any(b.status == "paid" for b in sess_bills):
+                continue
+        else:
+            bill_res = await db.execute(
+                select(Bill).where(
+                    Bill.order_id == order.id,
+                    Bill.deleted_at.is_(None),
+                )
+            )
+            bill = bill_res.scalar_one_or_none()
+            if bill and bill.status == "paid":
+                continue
+
+        filtered.append(order)
 
     return [_build_order_out(o) for o in filtered]

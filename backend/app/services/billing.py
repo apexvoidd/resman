@@ -155,7 +155,7 @@ async def generate_bill(
             detail="Order not found.",
         )
 
-    # 2. Fetch ALL non-cancelled orders from the same session or table
+    # 2. Fetch ALL non-cancelled orders from the same active session or table
     if order.guest_session_id:
         all_orders_res = await db.execute(
             select(Order)
@@ -168,16 +168,45 @@ async def generate_bill(
         )
         session_orders = all_orders_res.scalars().all()
     elif order.table_id:
-        all_orders_res = await db.execute(
-            select(Order)
-            .options(selectinload(Order.items).selectinload(OrderItem.menu_item))
-            .where(
-                Order.table_id == order.table_id,
-                Order.deleted_at.is_(None),
-                Order.status.notin_(["cancelled"]),
+        # Check active guest session for table
+        active_sess_res = await db.execute(
+            select(GuestSession).where(
+                GuestSession.table_id == order.table_id,
+                GuestSession.is_active.is_(True),
             )
         )
-        session_orders = all_orders_res.scalars().all()
+        active_sess = active_sess_res.scalar_one_or_none()
+
+        if active_sess:
+            all_orders_res = await db.execute(
+                select(Order)
+                .options(selectinload(Order.items).selectinload(OrderItem.menu_item))
+                .where(
+                    Order.guest_session_id == active_sess.id,
+                    Order.deleted_at.is_(None),
+                    Order.status.notin_(["cancelled"]),
+                )
+            )
+            session_orders = all_orders_res.scalars().all()
+        else:
+            # Exclude orders whose bill is already paid
+            all_orders_res = await db.execute(
+                select(Order)
+                .options(selectinload(Order.items).selectinload(OrderItem.menu_item))
+                .where(
+                    Order.table_id == order.table_id,
+                    Order.deleted_at.is_(None),
+                    Order.status.notin_(["cancelled"]),
+                )
+            )
+            raw_orders = all_orders_res.scalars().all()
+            session_orders = []
+            for o in raw_orders:
+                b_res = await db.execute(
+                    select(Bill).where(Bill.order_id == o.id, Bill.status == "paid")
+                )
+                if b_res.scalar_one_or_none() is None:
+                    session_orders.append(o)
     else:
         session_orders = [order]
 
@@ -191,12 +220,16 @@ async def generate_bill(
             detail=f"Cannot generate bill — {len(incomplete)} order(s) still in progress ({statuses}). Wait for kitchen to complete all orders.",
         )
 
-    # 4. Check if a consolidated bill already exists for this session
+    # 4. Check if an unpaid consolidated bill already exists for this session
     session_order_ids = [o.id for o in session_orders]
     existing_bill_res = await db.execute(
         select(Bill)
         .options(selectinload(Bill.items))
-        .where(Bill.order_id.in_(session_order_ids), Bill.deleted_at.is_(None))
+        .where(
+            Bill.order_id.in_(session_order_ids),
+            Bill.deleted_at.is_(None),
+            Bill.status != "paid",
+        )
         .order_by(Bill.created_at.desc())
         .limit(1)
     )
