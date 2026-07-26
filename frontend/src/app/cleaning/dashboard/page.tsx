@@ -118,19 +118,24 @@ function CleaningDashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/80 px-6 py-4 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
+      {/* Header with Fresh Cyan & Aqua Theme */}
+      <header className="border-b border-cyan-500/20 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-transparent px-4 sm:px-6 py-4 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-xl text-blue-400 ring-1 ring-blue-500/20">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/20 text-xl font-extrabold text-cyan-300 ring-1 ring-cyan-500/40 shadow-lg shadow-cyan-500/10">
               🧹
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white tracking-tight">
-                Cleaning Staff Dashboard
-              </h1>
-              <p className="text-xs text-gray-400">
-                Tables pending cleaning after bill payment
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-black text-white tracking-tight">
+                  Housekeeping & Table Hygiene Queue
+                </h1>
+                <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-black uppercase text-cyan-300 ring-1 ring-cyan-500/40">
+                  Cleaning Station
+                </span>
+              </div>
+              <p className="text-xs text-cyan-200/70">
+                Tables pending cleaning after bill payment settlement
               </p>
             </div>
           </div>

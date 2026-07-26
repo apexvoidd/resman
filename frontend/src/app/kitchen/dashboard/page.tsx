@@ -247,26 +247,33 @@ function KitchenDashboardPage() {
   const readyCount = orders.filter((o) => o.status === "ready").length;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-6">
+    <div className="min-h-screen bg-gray-950 text-gray-100 p-4 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* Top KDS Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-800 pb-5">
+        {/* Top KDS Bar with Flame Amber & Warm Orange Theme */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-3xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-transparent p-5 backdrop-blur-xl shadow-xl">
           <div>
             <div className="flex items-center gap-3">
-              <span className="text-2xl">🍳</span>
-              <h1 className="text-2xl font-bold text-white tracking-tight">Kitchen Display System (KDS)</h1>
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-2xl shadow ring-1 ring-amber-500/30">🍳</span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-black text-white tracking-tight">Kitchen Display System</h1>
+                  <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-black uppercase text-amber-300 ring-1 ring-amber-500/40">
+                    KDS Station
+                  </span>
+                </div>
+                <p className="text-xs text-amber-200/70">Real-time dish preparation, timing estimates, and station workflow</p>
+              </div>
             </div>
-            <p className="text-xs text-gray-400">Real-time dish preparation, timing estimates, and station workflow</p>
           </div>
 
-          <div className="flex items-center gap-3 text-xs">
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2 text-amber-400 font-bold">
+          <div className="flex items-center gap-2.5 text-xs font-bold">
+            <div className="flex-1 sm:flex-none text-center rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-amber-300 shadow">
               Pending: {pendingCount}
             </div>
-            <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-3.5 py-2 text-blue-400 font-bold">
+            <div className="flex-1 sm:flex-none text-center rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-blue-300 shadow">
               Preparing: {preparingCount}
             </div>
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2 text-emerald-400 font-bold">
+            <div className="flex-1 sm:flex-none text-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-emerald-300 shadow">
               Ready: {readyCount}
             </div>
           </div>

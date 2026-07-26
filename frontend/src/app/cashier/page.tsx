@@ -160,17 +160,22 @@ function CashierPOSPage() {
     <RouteGuard roles={["cashier", "waiter", "manager", "admin"]}>
       <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-7xl space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-5 gap-4">
+          {/* Header with Financial Gold & Mint Theme */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-3xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 via-emerald-500/10 to-transparent p-5 backdrop-blur-xl gap-4 shadow-xl">
             <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-xl">
+              <div className="h-12 w-12 rounded-2xl bg-yellow-500/20 border border-yellow-500/40 flex items-center justify-center text-2xl shadow-lg shadow-yellow-500/10">
                 💵
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                  Cashier POS Terminal
-                </h1>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                    Cashier POS Terminal
+                  </h1>
+                  <span className="rounded-full bg-yellow-500/20 px-2.5 py-0.5 text-[10px] font-black uppercase text-yellow-300 ring-1 ring-yellow-500/40">
+                    POS Register
+                  </span>
+                </div>
+                <p className="text-xs text-yellow-200/70 mt-0.5">
                   Process Cash, Card & UPI Settlements, Calculate Cash Change, & Issue Receipts
                 </p>
               </div>

@@ -225,22 +225,27 @@ function WaiterDashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Header Bar */}
-      <header className="border-b border-gray-800 bg-gray-900/80 px-6 py-4 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
+      {/* Header Bar with Active Emerald & Mint Theme */}
+      <header className="border-b border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-transparent px-4 sm:px-6 py-4 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-xl font-bold text-amber-400 ring-1 ring-amber-500/20">
-              🛎️
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/20 text-xl font-extrabold text-emerald-300 ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-500/10">
+              📋
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white tracking-tight">Waiter Verification & Live Table Matrix</h1>
-              <p className="text-xs text-gray-400">Real-time arrival verification and floor status</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-black text-white tracking-tight">Waiter POS & Floor Matrix</h1>
+                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black uppercase text-emerald-300 ring-1 ring-emerald-500/40">
+                  Waiter POS
+                </span>
+              </div>
+              <p className="text-xs text-emerald-200/70">Real-time customer arrival verification, order status, & floor control</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400 ring-1 ring-emerald-500/20">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              Live Polling (3s)
+            <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-300 ring-1 ring-emerald-500/40 shadow">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+              Live Matrix
             </span>
           </div>
         </div>

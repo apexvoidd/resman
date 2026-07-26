@@ -140,17 +140,22 @@ export default function ManagerDashboardPage() {
     <RouteGuard roles={["manager", "admin"]}>
       <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-7xl space-y-6">
-          {/* Executive Header */}
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-slate-800 pb-5">
+          {/* Executive Header with Royal Indigo & Deep Purple Theme */}
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between rounded-3xl border border-indigo-500/30 bg-gradient-to-r from-indigo-600/20 via-purple-600/10 to-transparent p-5 backdrop-blur-xl shadow-xl">
             <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-xl">
+              <div className="h-12 w-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-2xl shadow-lg shadow-indigo-500/10">
                 👔
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                  Manager Executive Dashboard
-                </h1>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                    Manager Executive Hub
+                  </h1>
+                  <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-black uppercase text-indigo-300 ring-1 ring-indigo-500/40">
+                    Executive Control
+                  </span>
+                </div>
+                <p className="text-xs text-indigo-200/70 mt-0.5">
                   Real-time Revenue KPIs, Recipe Margin Profiler, & Emergency Overrides
                 </p>
               </div>

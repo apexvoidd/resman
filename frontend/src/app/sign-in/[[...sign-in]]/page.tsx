@@ -27,8 +27,38 @@ export default function SignInPage() {
       </div>
 
       <div className="w-full max-w-4xl z-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-        {/* Hackathon Judge Quick Credentials Banner */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
+        {/* Styled High-Contrast Sign-In Card Container (FIRST ON MOBILE) */}
+        <div className="order-1 md:order-2 bg-slate-900 border border-slate-800 rounded-3xl p-2 sm:p-4 shadow-2xl backdrop-blur-xl">
+          <SignIn
+            fallbackRedirectUrl="/redirect"
+            forceRedirectUrl="/redirect"
+            appearance={{
+              elements: {
+                card: "bg-slate-900 border-none shadow-none text-slate-100 p-4 sm:p-6",
+                headerTitle: "text-xl font-extrabold text-white",
+                headerSubtitle: "text-xs font-medium text-slate-400",
+                socialButtonsBlockButton:
+                  "bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 text-xs font-semibold rounded-xl transition",
+                formButtonPrimary:
+                  "bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-lg shadow-sky-600/20",
+                formFieldLabel: "text-xs font-bold text-slate-300",
+                formFieldInput:
+                  "bg-slate-950 border border-slate-700 text-slate-100 text-xs rounded-xl focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition px-3.5 py-2.5",
+                footerAction: "hidden",
+                footerActionLink: "hidden",
+                footerActionText: "hidden",
+                footer: "hidden",
+                dividerLine: "bg-slate-800",
+                dividerText: "text-xs text-slate-400 font-semibold bg-slate-900 px-2",
+                identityPreviewText: "text-xs text-slate-200 font-semibold",
+                identityPreviewEditButtonIcon: "text-sky-400",
+              },
+            }}
+          />
+        </div>
+
+        {/* Hackathon Judge Quick Credentials Banner (SECOND ON MOBILE) */}
+        <div className="order-2 md:order-1 bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
           <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
             <span className="text-lg">🏆</span>
             <div>
@@ -72,36 +102,6 @@ export default function SignInPage() {
               Enter Customer Portal ➔
             </Link>
           </div>
-        </div>
-
-        {/* Styled High-Contrast Sign-In Card Container */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-2 sm:p-4 shadow-2xl backdrop-blur-xl">
-          <SignIn
-            fallbackRedirectUrl="/redirect"
-            forceRedirectUrl="/redirect"
-            appearance={{
-              elements: {
-                card: "bg-slate-900 border-none shadow-none text-slate-100 p-4 sm:p-6",
-                headerTitle: "text-xl font-extrabold text-white",
-                headerSubtitle: "text-xs font-medium text-slate-400",
-                socialButtonsBlockButton:
-                  "bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 text-xs font-semibold rounded-xl transition",
-                formButtonPrimary:
-                  "bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-lg shadow-sky-600/20",
-                formFieldLabel: "text-xs font-bold text-slate-300",
-                formFieldInput:
-                  "bg-slate-950 border border-slate-700 text-slate-100 text-xs rounded-xl focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition px-3.5 py-2.5",
-                footerAction: "hidden",
-                footerActionLink: "hidden",
-                footerActionText: "hidden",
-                footer: "hidden",
-                dividerLine: "bg-slate-800",
-                dividerText: "text-xs text-slate-400 font-semibold bg-slate-900 px-2",
-                identityPreviewText: "text-xs text-slate-200 font-semibold",
-                identityPreviewEditButtonIcon: "text-sky-400",
-              },
-            }}
-          />
         </div>
       </div>
     </main>
