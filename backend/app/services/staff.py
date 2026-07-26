@@ -136,17 +136,16 @@ async def get_staff_by_id(db: AsyncSession, staff_id: uuid.UUID) -> StaffOut:
 async def create_staff(db: AsyncSession, payload: StaffCreate) -> StaffOut:
     """
     Create a new staff user and assign specified roles.
-    Checks for duplicate email address and raises 409 Conflict if found.
+    Checks for duplicate email address and raises 409 Conflict if found on an active account.
+    Re-activates and updates if account was previously soft-deleted.
     """
     # 1. Check duplicate email
-    existing = await db.execute(
-        select(User).where(User.email.ilike(payload.email))
+    existing_res = await db.execute(
+        select(User)
+        .options(selectinload(User.user_roles))
+        .where(User.email.ilike(payload.email))
     )
-    if existing.scalar_one_or_none() is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"A staff member with email '{payload.email}' already exists.",
-        )
+    existing = existing_res.scalar_one_or_none()
 
     # 2. Validate roles exist
     roles_result = await db.execute(
@@ -161,7 +160,14 @@ async def create_staff(db: AsyncSession, payload: StaffCreate) -> StaffOut:
             detail=f"Invalid role code(s): {', '.join(missing)}",
         )
 
-    # 3. Provision user in Clerk Backend API if CLERK_SECRET_KEY is configured
+    # 3. If email exists and is active, block creation
+    if existing is not None and existing.deleted_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A staff member with email '{payload.email}' already exists.",
+        )
+
+    # 4. Provision user in Clerk Backend API if CLERK_SECRET_KEY is configured
     clerk_user_id = None
     if settings.CLERK_SECRET_KEY and payload.password:
         try:
@@ -184,7 +190,28 @@ async def create_staff(db: AsyncSession, payload: StaffCreate) -> StaffOut:
         except Exception:
             pass
 
-    # 4. Create User record
+    # 5. If user was soft-deleted, re-activate & update profile
+    if existing is not None and existing.deleted_at is not None:
+        existing.first_name = payload.first_name
+        existing.last_name = payload.last_name
+        existing.phone = payload.phone
+        existing.is_active = payload.is_active
+        existing.deleted_at = None
+        existing.clerk_user_id = clerk_user_id
+
+        # Delete existing user roles
+        for ur in list(existing.user_roles):
+            await db.delete(ur)
+        await db.flush()
+
+        # Assign new UserRole relations
+        for role in roles:
+            db.add(UserRole(user_id=existing.id, role_id=role.id, branch_id=None))
+
+        await db.commit()
+        return await get_staff_by_id(db, existing.id)
+
+    # 6. Create brand-new User record
     user = User(
         email=payload.email,
         clerk_user_id=clerk_user_id,
@@ -197,14 +224,11 @@ async def create_staff(db: AsyncSession, payload: StaffCreate) -> StaffOut:
     db.add(user)
     await db.flush()  # assign user.id
 
-    # 4. Assign UserRole relations
     for role in roles:
         user_role = UserRole(user_id=user.id, role_id=role.id, branch_id=None)
         db.add(user_role)
 
     await db.commit()
-
-    # Re-query user with eager loaded relationships
     return await get_staff_by_id(db, user.id)
 
 
@@ -228,7 +252,7 @@ async def update_staff(
     if payload.email and payload.email.lower() != user.email.lower():
         existing = await db.execute(
             select(User).where(
-                User.email.ilike(payload.email), User.id != staff_id
+                User.email.ilike(payload.email), User.id != staff_id, User.deleted_at.is_(None)
             )
         )
         if existing.scalar_one_or_none() is not None:
@@ -305,8 +329,21 @@ async def delete_staff(db: AsyncSession, staff_id: uuid.UUID) -> None:
             detail=f"Staff member with ID '{staff_id}' not found.",
         )
 
+    # Delete user from Clerk Backend API if clerk_user_id & CLERK_SECRET_KEY are configured
+    if settings.CLERK_SECRET_KEY and user.clerk_user_id:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.delete(
+                    f"https://api.clerk.com/v1/users/{user.clerk_user_id}",
+                    headers={"Authorization": f"Bearer {settings.CLERK_SECRET_KEY}"},
+                )
+        except Exception:
+            pass
+
     user.deleted_at = datetime.now(UTC)
     user.is_active = False
+    user.clerk_user_id = None
     await db.commit()
 
 

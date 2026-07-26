@@ -94,6 +94,9 @@ async def get_or_create_user(
     if user is not None:
         # Bind the existing local record to the Clerk identity
         user.clerk_user_id = clerk_user_id
+        if user.deleted_at is not None:
+            user.deleted_at = None
+            user.is_active = True
         if not has_superadmin:
             user.is_superadmin = True
         await db.commit()
