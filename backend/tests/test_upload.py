@@ -53,3 +53,32 @@ def test_upload_invalid_file_type():
     response = client.post("/api/v1/menu/items/image", files=files)
     assert response.status_code == 400
     assert "Unsupported file type" in response.json()["detail"]
+
+
+def test_upload_supabase_storage_success(monkeypatch):
+    from app.config.settings import settings
+    import httpx
+
+    monkeypatch.setattr(settings, "SUPABASE_URL", "https://testproj.supabase.co")
+    monkeypatch.setattr(settings, "SUPABASE_KEY", "test-key-123")
+    monkeypatch.setattr(settings, "SUPABASE_BUCKET_NAME", "test-bucket")
+
+    class MockResponse:
+        status_code = 200
+        text = "OK"
+
+    async def mock_post(*args, **kwargs):
+        return MockResponse()
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    client = TestClient(app)
+    fake_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+    files = {"file": ("test.png", fake_png, "image/png")}
+
+    response = client.post("/api/v1/menu/items/image", files=files)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert "image_url" in data
+    assert "https://testproj.supabase.co/storage/v1/object/public/test-bucket/menu-items/" in data["image_url"]
+

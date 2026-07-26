@@ -43,6 +43,15 @@ def _r2_endpoint() -> str:
     return f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
 
+def _is_supabase_configured() -> bool:
+    return bool(
+        settings.SUPABASE_URL
+        and settings.SUPABASE_KEY
+        and settings.SUPABASE_BUCKET_NAME
+        and not settings.SUPABASE_URL.startswith("your-")
+    )
+
+
 def _is_r2_configured() -> bool:
     return bool(
         settings.R2_ACCOUNT_ID
@@ -51,6 +60,42 @@ def _is_r2_configured() -> bool:
         and settings.R2_BUCKET_NAME
         and not settings.R2_ACCOUNT_ID.startswith("your-")
     )
+
+
+async def _upload_to_supabase(data: bytes, content_type: str, folder: str) -> str:
+    """Upload file bytes to Supabase Storage REST API and return public URL."""
+    import httpx
+
+    ext = mimetypes.guess_extension(content_type) or ".jpg"
+    ext = ext.replace(".jpe", ".jpg").replace(".jpeg", ".jpg")
+    if content_type == "image/svg+xml":
+        ext = ".svg"
+    elif content_type == "image/avif":
+        ext = ".avif"
+
+    filename = f"{uuid.uuid4().hex}{ext}"
+    object_path = f"{folder}/{filename}"
+
+    base_url = settings.SUPABASE_URL.rstrip("/")
+    bucket = settings.SUPABASE_BUCKET_NAME.strip()
+
+    upload_url = f"{base_url}/storage/v1/object/{bucket}/{object_path}"
+    headers = {
+        "Authorization": f"Bearer {settings.SUPABASE_KEY}",
+        "apiKey": settings.SUPABASE_KEY,
+        "Content-Type": content_type,
+        "x-upsert": "true",
+    }
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(upload_url, content=data, headers=headers)
+        if resp.status_code not in (200, 201):
+            logger.error("Supabase Storage upload failed [%s]: %s", resp.status_code, resp.text)
+            raise RuntimeError(f"Supabase Storage upload failed ({resp.status_code}): {resp.text}")
+
+    public_url = f"{base_url}/storage/v1/object/public/{bucket}/{object_path}"
+    logger.info("File uploaded to Supabase Storage: %s", public_url)
+    return public_url
 
 
 async def _save_locally(file_data: bytes, content_type: str, folder: str) -> str:
@@ -102,6 +147,12 @@ async def upload_file_to_r2(file: UploadFile, folder: str = "uploads") -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File size exceeds limit ({_MAX_SIZE_BYTES // (1024 * 1024)} MB max).",
         )
+
+    if _is_supabase_configured():
+        try:
+            return await _upload_to_supabase(data, content_type, folder)
+        except Exception as exc:
+            logger.warning("Supabase upload failed (%s). Falling back.", exc)
 
     if not _is_r2_configured():
         return await _save_locally(data, content_type, folder)
