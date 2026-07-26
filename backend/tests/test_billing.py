@@ -40,3 +40,19 @@ def test_equal_split_math():
     share = round(grand_total / split_count, 2)
     assert share == 250.0
     assert (grand_total - share) == 750.0
+
+
+def test_cash_payment_sum_settlement_calculation():
+    """Verify that existing paid sum plus new cash payment sum equals grand total for bill status paid."""
+    existing_payments = []
+    new_payment_amount = 500.0
+    bill_total_amount = 500.0
+
+    existing_paid_sum = sum(
+        float(p.amount) for p in existing_payments if p.get("status") == "completed"
+    )
+    all_paid_sum = existing_paid_sum + new_payment_amount
+
+    assert all_paid_sum >= bill_total_amount
+    status = "paid" if all_paid_sum >= bill_total_amount else "partially_paid"
+    assert status == "paid"

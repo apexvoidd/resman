@@ -227,6 +227,32 @@ async def confirm_cash_payment(
     return await billing_service.confirm_cash_payment(db, payload, current_user)
 
 
+@router.post(
+    "/cash/request",
+    summary="Customer requests cash settlement",
+    status_code=status.HTTP_200_OK,
+)
+async def request_cash_settlement(
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Customer requests cash settlement from table."""
+    bill_id_str = payload.get("bill_id")
+    if not bill_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="bill_id required in request body.",
+        )
+    try:
+        bill_id = uuid.UUID(str(bill_id_str))
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid bill_id UUID format.",
+        )
+    return await billing_service.request_cash_settlement(db, bill_id)
+
+
 @router.get(
     "/invoices/{bill_id}/html",
     response_class=HTMLResponse,

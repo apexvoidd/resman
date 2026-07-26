@@ -269,6 +269,24 @@ export async function confirmCashPayment(
 }
 
 /**
+ * Customer requests cash settlement from table
+ */
+export async function requestCashSettlement(billId: string): Promise<{ message: string }> {
+  const res = await fetch(`${API}/api/v1/billing/cash/request`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ bill_id: billId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? "Failed to send cash settlement request.");
+  }
+  return res.json();
+}
+
+/**
  * Dismiss a single notification
  */
 export async function dismissNotification(token: string, notificationId: string): Promise<{ message: string }> {

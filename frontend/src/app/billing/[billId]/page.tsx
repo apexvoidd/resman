@@ -9,6 +9,7 @@ import {
   createRazorpayOrder,
   getBill,
   getInvoiceHtmlUrl,
+  requestCashSettlement,
   SplitBillResult,
   unlockSession,
   verifyRazorpayPayment,
@@ -202,19 +203,24 @@ export default function BillingPage() {
   };
 
   const handleCashPayment = async () => {
-    if (!bill || !authToken) {
-      setErrorMsg("Staff login required for cash payment. Please ask the cashier or waiter to confirm cash payment.");
-      return;
-    }
+    if (!bill) return;
     try {
       setIsProcessingPayment(true);
       setErrorMsg(null);
       setSuccessMsg(null);
 
       const targetAmount = splitResult ? splitResult.share_amount : bill.grand_total;
-      await confirmCashPayment(authToken, bill.id, targetAmount, cashNotes);
-      setSuccessMsg("Cash payment recorded & session closed!");
-      await loadBillData();
+
+      if (authToken) {
+        // Staff logged in — confirm cash payment directly
+        await confirmCashPayment(authToken, bill.id, targetAmount, cashNotes);
+        setSuccessMsg("Cash payment recorded & session closed!");
+        await loadBillData();
+      } else {
+        // Customer on phone — request cash settlement from cashier/waiter
+        const res = await requestCashSettlement(bill.id);
+        setSuccessMsg(res.message || `Cash settlement request sent! Please pay ₹${targetAmount.toFixed(2)} to staff at your table or cashier counter.`);
+      }
     } catch (err: unknown) {
       const e = err as Error;
       setErrorMsg(e.message || "Failed to record cash payment.");
@@ -596,8 +602,10 @@ export default function BillingPage() {
                     className="w-full py-3.5 bg-amber-600 hover:bg-amber-500 text-white font-extrabold rounded-xl shadow-lg shadow-amber-600/20 text-sm transition"
                   >
                     {isProcessingPayment
-                      ? "Recording Cash Payment..."
-                      : `Confirm Cash Payment ₹${(splitResult ? splitResult.share_amount : bill.grand_total).toFixed(2)}`}
+                      ? (authToken ? "Recording Cash Payment..." : "Sending Cash Request...")
+                      : (authToken
+                          ? `Confirm Cash Payment ₹${(splitResult ? splitResult.share_amount : bill.grand_total).toFixed(2)}`
+                          : `🙋 Request Cash Settlement (₹${(splitResult ? splitResult.share_amount : bill.grand_total).toFixed(2)})`)}
                   </button>
                 )}
               </div>

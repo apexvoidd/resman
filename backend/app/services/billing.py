@@ -731,9 +731,12 @@ async def verify_razorpay_payment(
     await db.flush()
 
     # Calculate total completed payments for bill
-    all_paid_sum = sum(
-        float(p.amount) for p in (bill.payments or []) if p.status == "completed" or p == payment
+    existing_paid_sum = sum(
+        float(p.amount)
+        for p in (bill.payments or [])
+        if p.status == "completed" and p != payment and getattr(p, "id", None) != getattr(payment, "id", None)
     )
+    all_paid_sum = existing_paid_sum + paid_amt
 
     if all_paid_sum >= float(bill.total_amount):
         bill.status = "paid"
@@ -809,9 +812,12 @@ async def confirm_cash_payment(
     db.add(payment)
     await db.flush()
 
-    all_paid_sum = sum(
-        float(p.amount) for p in (bill.payments or []) if p.status == "completed" or p == payment
+    existing_paid_sum = sum(
+        float(p.amount)
+        for p in (bill.payments or [])
+        if p.status == "completed" and p != payment and getattr(p, "id", None) != getattr(payment, "id", None)
     )
+    all_paid_sum = existing_paid_sum + float(payload.amount)
 
     if all_paid_sum >= float(bill.total_amount):
         bill.status = "paid"
@@ -848,6 +854,53 @@ async def confirm_cash_payment(
         paid_at=payment.paid_at,
         notes=payment.notes,
     )
+
+
+async def request_cash_settlement(db: AsyncSession, bill_id: uuid.UUID) -> dict[str, str]:
+    """Customer requests cash settlement for their bill."""
+    b_res = await db.execute(
+        select(Bill)
+        .options(
+            selectinload(Bill.order).selectinload(Order.table),
+            selectinload(Bill.order).selectinload(Order.guest_session),
+        )
+        .where(Bill.id == bill_id, Bill.deleted_at.is_(None))
+    )
+    bill = b_res.scalar_one_or_none()
+    if not bill:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
+
+    table_num = bill.order.table.table_number if (bill.order and bill.order.table) else "N/A"
+    guest_name = (
+        bill.order.guest_session.guest_name
+        if (bill.order and bill.order.guest_session and bill.order.guest_session.guest_name)
+        else "Guest"
+    )
+
+    db.add(
+        Notification(
+            recipient_type="cashier",
+            title=f"💵 Cash Payment Requested — Table {table_num}",
+            message=f"{guest_name} at Table {table_num} requested to pay ₹{float(bill.total_amount):.2f} in cash for Bill #{bill.bill_number}.",
+            notification_type="cash_settlement_requested",
+            status="unread",
+            payload_json={"bill_id": str(bill.id), "table_number": table_num, "amount": float(bill.total_amount)},
+        )
+    )
+    db.add(
+        Notification(
+            recipient_type="waiter",
+            title=f"💵 Cash Payment Requested — Table {table_num}",
+            message=f"{guest_name} at Table {table_num} requested to pay ₹{float(bill.total_amount):.2f} in cash for Bill #{bill.bill_number}.",
+            notification_type="cash_settlement_requested",
+            status="unread",
+            payload_json={"bill_id": str(bill.id), "table_number": table_num, "amount": float(bill.total_amount)},
+        )
+    )
+    await db.commit()
+    return {
+        "message": f"Cash settlement requested for Table {table_num}! Please pay ₹{float(bill.total_amount):.2f} to staff at your table or cashier counter."
+    }
 
 
 async def _execute_post_payment_actions(

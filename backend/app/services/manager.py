@@ -143,7 +143,7 @@ async def get_recipe_profitability_analysis(db: AsyncSession) -> list[dict[str, 
     analysis = []
     for r in recipes:
         menu_item = r.menu_item
-        selling_price = float(menu_item.price) if menu_item else 0.0
+        selling_price = float(menu_item.price) if menu_item and menu_item.price is not None else 0.0
 
         total_recipe_cost = 0.0
         ingredient_breakdown = []
@@ -157,16 +157,17 @@ async def get_recipe_profitability_analysis(db: AsyncSession) -> list[dict[str, 
                 cost = qty * unit_cost
                 total_recipe_cost += cost
 
-                if qty > 0 and ing.current_stock is not None:
-                    portion_limits.append(int(ing.current_stock // qty))
+                current_stock_val = float(ing.current_stock or 0.0)
+                if qty > 0:
+                    portion_limits.append(int(current_stock_val // qty))
 
                 ingredient_breakdown.append({
                     "ingredient_name": ing.name,
                     "quantity": qty,
-                    "unit": ri.unit_of_measure,
+                    "unit": ri.unit_of_measure or ing.unit_of_measure or "",
                     "unit_cost": unit_cost,
                     "total_cost": round(cost, 2),
-                    "current_stock": float(ing.current_stock or 0.0),
+                    "current_stock": current_stock_val,
                 })
 
         gross_profit = selling_price - total_recipe_cost
@@ -176,7 +177,7 @@ async def get_recipe_profitability_analysis(db: AsyncSession) -> list[dict[str, 
 
         analysis.append({
             "recipe_id": str(r.id),
-            "menu_item_id": str(r.menu_item_id),
+            "menu_item_id": str(r.menu_item_id) if r.menu_item_id else "",
             "menu_item_name": menu_item.name if menu_item else r.name,
             "selling_price": selling_price,
             "recipe_cost": round(total_recipe_cost, 2),

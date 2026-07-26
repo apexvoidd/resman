@@ -81,6 +81,10 @@ export default function CashierPOSPage() {
   useEffect(() => {
     if (!rbacLoading && isAuthorized) {
       loadBills();
+      const interval = setInterval(() => {
+        loadBills();
+      }, 10000);
+      return () => clearInterval(interval);
     }
   }, [rbacLoading, isAuthorized]);
 
