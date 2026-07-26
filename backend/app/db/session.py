@@ -89,6 +89,12 @@ async def init_db() -> None:
 
         await conn.run_sync(_sync_migrations)
 
+    try:
+        from scripts.seed_roles import seed
+        await seed()
+    except Exception as e:
+        print(f"Role seeding notice: {e}")
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency that yields async database sessions."""

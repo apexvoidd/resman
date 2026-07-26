@@ -10,7 +10,7 @@ import logging
 from typing import Any
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
@@ -41,7 +41,14 @@ async def get_or_create_user(
     """
     Look up the local user by clerk_user_id.
     If not found, fetch from Clerk API and create a local record.
+    If no superadmin exists in the system yet, promote the first user to superadmin.
     """
+    # Check if any superadmin exists in the DB
+    superadmin_count = await db.execute(
+        select(func.count(User.id)).where(User.is_superadmin == True)
+    )
+    has_superadmin = (superadmin_count.scalar_one_or_none() or 0) > 0
+
     # 1. Try to find existing user
     result = await db.execute(
         select(User).where(User.clerk_user_id == clerk_user_id)
@@ -49,7 +56,7 @@ async def get_or_create_user(
     user: User | None = result.scalar_one_or_none()
 
     if user is not None:
-        if settings.APP_ENV == "development" and not user.is_superadmin:
+        if not has_superadmin or (settings.APP_ENV == "development" and not user.is_superadmin):
             user.is_superadmin = True
             await db.commit()
             await db.refresh(user)
@@ -87,12 +94,18 @@ async def get_or_create_user(
     if user is not None:
         # Bind the existing local record to the Clerk identity
         user.clerk_user_id = clerk_user_id
+        if not has_superadmin:
+            user.is_superadmin = True
         await db.commit()
         await db.refresh(user)
         return user
 
     # 4. Create a brand-new local user record
-    is_admin = clerk_user_id == "dev_admin_user_01" or settings.APP_ENV == "development"
+    is_admin = (
+        clerk_user_id == "dev_admin_user_01"
+        or settings.APP_ENV == "development"
+        or not has_superadmin
+    )
     user = User(
         email=primary_email,
         clerk_user_id=clerk_user_id,
@@ -105,5 +118,6 @@ async def get_or_create_user(
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    logger.info("Created local user %s for Clerk ID %s", user.id, clerk_user_id)
+    logger.info("Created local user %s for Clerk ID %s (is_superadmin=%s)", user.id, clerk_user_id, is_admin)
     return user
+

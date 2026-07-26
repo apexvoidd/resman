@@ -58,3 +58,19 @@ def test_cors_actual_request_headers(client):
     assert response.status_code == 200
     assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
     assert response.headers.get("access-control-allow-credentials") == "true"
+
+
+def test_cors_vercel_domain(client):
+    origin = "https://resman-aqqx.vercel.app"
+    response = client.options(
+        "/api/v1/guest/session",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type, x-session-token",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == origin
+    assert response.headers.get("access-control-allow-credentials") == "true"
+
