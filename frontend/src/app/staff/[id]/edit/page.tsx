@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -32,6 +32,7 @@ export default function EditStaffPage({
   const { hasRole, isLoading: isRbacLoading } = useRBAC();
   const isAdmin = hasRole("admin");
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -103,6 +104,8 @@ export default function EditStaffPage({
       return updateStaff(token, staffId, values);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff-list"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", staffId] });
       router.push("/staff");
     },
     onError: (err: Error) => {

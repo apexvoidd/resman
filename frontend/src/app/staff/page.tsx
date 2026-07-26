@@ -90,6 +90,7 @@ function StaffListPage() {
       });
     },
     enabled: !!isSignedIn && isAdmin,
+    refetchInterval: 3000,
   });
 
   // Toggle active status mutation

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -28,6 +28,7 @@ export default function AddStaffPage() {
   const { hasRole, isLoading: isRbacLoading } = useRBAC();
   const isAdmin = hasRole("admin");
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -69,6 +70,7 @@ export default function AddStaffPage() {
       return createStaff(token, values);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff-list"] });
       router.push("/staff");
     },
     onError: (err: Error) => {
