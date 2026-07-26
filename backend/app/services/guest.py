@@ -76,6 +76,7 @@ async def _get_default_branch(db: AsyncSession) -> Branch:
                 capacity=capacity,
                 status="available",
                 is_active=True,
+                qr_identifier=f"qr_table_t{i}_{uuid.uuid4().hex[:8]}",
             )
             db.add(tbl)
         await db.commit()

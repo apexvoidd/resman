@@ -43,7 +43,7 @@ class DiningTable(BaseModel, SoftDeleteMixin):
         String(50), default="available", nullable=False, index=True
     )
     qr_identifier: Mapped[str] = mapped_column(
-        String(255), unique=True, nullable=False, index=True
+        String(255), unique=True, nullable=False, index=True, default=lambda: f"qr_{uuid.uuid4().hex}"
     )
     location_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
