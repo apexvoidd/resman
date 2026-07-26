@@ -18,6 +18,11 @@ router = APIRouter(tags=["Recipe Management"])
 
 
 @router.get(
+    "",
+    response_model=list[RecipeOut],
+    include_in_schema=False,
+)
+@router.get(
     "/",
     response_model=list[RecipeOut],
     summary="List all recipes with ingredient requirements",
@@ -46,6 +51,11 @@ async def get_recipe_by_menu_item_id(
     return await recipe_service.get_recipe_by_menu_item_id(db, menu_item_id)
 
 
+@router.post(
+    "",
+    response_model=RecipeOut,
+    include_in_schema=False,
+)
 @router.post(
     "/",
     response_model=RecipeOut,

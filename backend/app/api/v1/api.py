@@ -52,7 +52,7 @@ api_router.include_router(kds.router)
 api_router.include_router(inventory.router)
 
 # Recipe Management Endpoints (Dual Mount for /recipes and /recipe)
-api_router.include_router(recipe.router)
+api_router.include_router(recipe.router, prefix="/recipes", tags=["Recipe Management"])
 api_router.include_router(recipe.router, prefix="/recipe", tags=["Recipe Management (Alias)"])
 
 # Manager Hub & Analytics Endpoints
