@@ -23,6 +23,17 @@ class AppException(Exception):
         super().__init__(message)
 
 
+def _add_cors_headers(request: Request, response: JSONResponse) -> JSONResponse:
+    origin = request.headers.get("origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Expose-Headers"] = "*"
+    return response
+
+
 def register_error_handlers(app: FastAPI) -> None:
     """Registers global exception handlers for FastAPI."""
 
@@ -32,7 +43,7 @@ def register_error_handlers(app: FastAPI) -> None:
             f"Application error: {exc.message}",
             extra={"path": request.url.path, "details": exc.details},
         )
-        return JSONResponse(
+        response = JSONResponse(
             status_code=exc.status_code,
             content={
                 "status": "error",
@@ -40,6 +51,7 @@ def register_error_handlers(app: FastAPI) -> None:
                 "details": exc.details,
             },
         )
+        return _add_cors_headers(request, response)
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
@@ -49,7 +61,7 @@ def register_error_handlers(app: FastAPI) -> None:
             f"Validation error on path {request.url.path}",
             extra={"errors": exc.errors()},
         )
-        return JSONResponse(
+        response = JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
                 "status": "error",
@@ -57,6 +69,7 @@ def register_error_handlers(app: FastAPI) -> None:
                 "details": jsonable_encoder(exc.errors()),
             },
         )
+        return _add_cors_headers(request, response)
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
@@ -65,10 +78,12 @@ def register_error_handlers(app: FastAPI) -> None:
             exc_info=True,
             extra={"path": request.url.path},
         )
-        return JSONResponse(
+        response = JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "status": "error",
                 "message": "An unexpected internal server error occurred.",
             },
         )
+        return _add_cors_headers(request, response)
+
