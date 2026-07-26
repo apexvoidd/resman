@@ -33,7 +33,7 @@ async def get_kds_orders(
     search: str | None = Query(None, description="Search by order number"),
     status: str | None = Query(None, description="Filter by status (pending, accepted, preparing, ready, paused, completed, everything=all including completed)"),
     sort_by: str | None = Query("oldest", description="Sort by: oldest, newest, longest_waiting"),
-    _: User = Depends(require_role(["waiter", "cashier", "kitchen_staff", "manager", "admin"])),
+    _: User = Depends(require_role(["waiter", "cashier", "kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Retrieve active kitchen orders cards with search, filtering, and sorting."""
@@ -69,7 +69,7 @@ async def get_waiter_orders(
 async def accept_order(
     order_id: uuid.UUID,
     payload: AcceptOrderInput,
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Accept pending order and set estimated prep time in minutes."""
@@ -86,7 +86,7 @@ async def accept_order(
 )
 async def start_preparing(
     order_id: uuid.UUID,
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Transition order status to preparing."""
@@ -101,7 +101,7 @@ async def start_preparing(
 )
 async def mark_order_ready(
     order_id: uuid.UUID,
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Mark order ready and send real-time notification to waiters."""
@@ -116,7 +116,7 @@ async def mark_order_ready(
 )
 async def mark_order_completed(
     order_id: uuid.UUID,
-    current_user: User = Depends(require_role(["waiter", "cashier", "kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["waiter", "cashier", "kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Mark order as completed."""
@@ -132,7 +132,7 @@ async def mark_order_completed(
 async def update_prep_time(
     order_id: uuid.UUID,
     payload: UpdatePrepTimeInput,
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Update estimated prep time in minutes."""
@@ -168,7 +168,7 @@ async def update_priority(
 async def pause_order(
     order_id: uuid.UUID,
     payload: PauseOrderInput,
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Pause order preparation."""
@@ -185,7 +185,7 @@ async def pause_order(
 )
 async def resume_order(
     order_id: uuid.UUID,
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Resume order preparation."""
