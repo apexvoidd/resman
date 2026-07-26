@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
+import { RouteGuard } from "@/components/RouteGuard";
 import {
   Category,
   deleteMenuItem,
@@ -14,7 +15,7 @@ import {
 } from "@/services/menu";
 import { getSafeImageUrl } from "@/lib/utils";
 
-export default function MenuItemListPage() {
+function MenuItemListPage() {
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
 
@@ -29,7 +30,8 @@ export default function MenuItemListPage() {
   const [availabilityFilter, setAvailabilityFilter] = useState<string>("all");
   const [priceSort, setPriceSort] = useState<"" | "asc" | "desc">("");
 
-  const isStaffAuthorized = hasRole("admin") || hasRole("manager");
+  const canManageMenu = hasRole("admin") || hasRole("manager");
+  const canViewMenu = hasRole("waiter", "kitchen", "kitchen_staff", "chef", "cashier", "manager", "admin");
 
   const loadData = async () => {
     try {
@@ -65,9 +67,9 @@ export default function MenuItemListPage() {
   };
 
   useEffect(() => {
-    if (isLoading || !isStaffAuthorized) return;
+    if (isLoading || !canViewMenu) return;
     loadData();
-  }, [isLoading, isStaffAuthorized, search, selectedCategory, availabilityFilter, priceSort]);
+  }, [isLoading, canViewMenu, search, selectedCategory, availabilityFilter, priceSort]);
 
   const handleToggleAvailability = async (item: MenuItem) => {
     try {
@@ -105,43 +107,31 @@ export default function MenuItemListPage() {
     );
   }
 
-  if (!isStaffAuthorized) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-950 p-4 text-white">
-        <div className="max-w-md rounded-2xl border border-red-500/20 bg-gray-900 p-6 text-center">
-          <span className="text-4xl">⚠️</span>
-          <h2 className="mt-3 text-lg font-bold text-red-400">Access Restricted</h2>
-          <p className="mt-1 text-sm text-gray-400">
-            Only Administrators and Managers can manage menu items.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-800 pb-5">
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Menu Item Management</h1>
-            <p className="text-xs text-gray-400">Manage restaurant dishes, pricing, preparation time, and availability</p>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Restaurant Menu Catalog</h1>
+            <p className="text-xs text-gray-400">Browse dishes, prices, preparation times, and dietary tags</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/menu/categories"
-              className="rounded-xl border border-gray-800 bg-gray-900 px-4 py-2.5 text-xs font-semibold text-gray-300 hover:bg-gray-800 transition"
-            >
-              📂 Manage Categories
-            </Link>
-            <Link
-              href="/menu/items/new"
-              className="rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
-            >
-              + Add Menu Item
-            </Link>
-          </div>
+          {canManageMenu && (
+            <div className="flex items-center gap-3">
+              <Link
+                href="/menu/categories"
+                className="rounded-xl border border-gray-800 bg-gray-900 px-4 py-2.5 text-xs font-semibold text-gray-300 hover:bg-gray-800 transition"
+              >
+                📂 Manage Categories
+              </Link>
+              <Link
+                href="/menu/items/new"
+                className="rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
+              >
+                + Add Menu Item
+              </Link>
+            </div>
+          )}
         </div>
 
         {errorMsg && (
@@ -307,39 +297,49 @@ export default function MenuItemListPage() {
                   </div>
                 </div>
 
-                {/* Footer Controls */}
-                <div className="flex items-center justify-between border-t border-gray-800 bg-gray-950 px-5 py-3">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleAvailability(item)}
-                    className={`text-xs font-semibold hover:underline ${
-                      item.is_available ? "text-red-400" : "text-emerald-400"
-                    }`}
-                  >
-                    {item.is_available ? "Disable Item" : "Enable Item"}
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/menu/items/${item.id}/edit`}
-                      className="rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700 transition"
-                    >
-                      Edit
-                    </Link>
+                {/* Footer Controls for Managers & Admins */}
+                {canManageMenu && (
+                  <div className="flex items-center justify-between border-t border-gray-800 bg-gray-950 px-5 py-3">
                     <button
                       type="button"
-                      onClick={() => handleDelete(item.id)}
-                      className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition"
+                      onClick={() => handleToggleAvailability(item)}
+                      className={`text-xs font-semibold hover:underline ${
+                        item.is_available ? "text-red-400" : "text-emerald-400"
+                      }`}
                     >
-                      Delete
+                      {item.is_available ? "Disable Item" : "Enable Item"}
                     </button>
+
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/menu/items/${item.id}/edit`}
+                        className="rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700 transition"
+                      >
+                        Edit
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id)}
+                        className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ))
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MenuItemListWrapper() {
+  return (
+    <RouteGuard roles={["waiter", "kitchen", "kitchen_staff", "chef", "cashier", "manager", "admin"]}>
+      <MenuItemListPage />
+    </RouteGuard>
   );
 }

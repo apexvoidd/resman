@@ -10,8 +10,9 @@ import {
   fetchCategories,
   uploadMenuItemImage,
 } from "@/services/menu";
+import { RouteGuard } from "@/components/RouteGuard";
 
-export default function AddMenuItemPage() {
+function AddMenuItemPage() {
   const router = useRouter();
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
@@ -359,5 +360,13 @@ export default function AddMenuItemPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function AddMenuItemPageWrapper() {
+  return (
+    <RouteGuard roles={["manager", "admin"]}>
+      <AddMenuItemPage />
+    </RouteGuard>
   );
 }

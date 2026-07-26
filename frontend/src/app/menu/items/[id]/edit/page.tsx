@@ -11,8 +11,9 @@ import {
   updateMenuItem,
   uploadMenuItemImage,
 } from "@/services/menu";
+import { RouteGuard } from "@/components/RouteGuard";
 
-export default function EditMenuItemPage({ params }: { params: Promise<{ id: string }> }) {
+function EditMenuItemPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const itemId = resolvedParams.id;
 
@@ -372,5 +373,13 @@ export default function EditMenuItemPage({ params }: { params: Promise<{ id: str
         </form>
       </div>
     </div>
+  );
+}
+
+export default function EditMenuItemPageWrapper({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <RouteGuard roles={["manager", "admin"]}>
+      <EditMenuItemPage params={params} />
+    </RouteGuard>
   );
 }
