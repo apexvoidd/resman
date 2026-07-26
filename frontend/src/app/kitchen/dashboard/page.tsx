@@ -16,10 +16,12 @@ import {
   updatePriority,
 } from "@/services/kds";
 import { OrderOut } from "@/services/order";
+import { useToast } from "@/context/ToastContext";
 
 function KitchenDashboardPage() {
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
+  const toast = useToast();
 
   const [orders, setOrders] = useState<OrderOut[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -85,10 +87,13 @@ function KitchenDashboardPage() {
 
       await acceptOrder(token, acceptingOrderId, prepMinutes);
       setAcceptingOrderId(null);
+      toast.success("Order accepted and sent to preparation pipeline!", "Order Accepted");
       await loadKDSData();
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to accept order.");
+      const msg = e.message || "Failed to accept order.";
+      setErrorMsg(msg);
+      toast.error(msg, "Order Accept Error");
     } finally {
       setActionLoading(null);
     }
@@ -101,10 +106,13 @@ function KitchenDashboardPage() {
       if (!token) return;
 
       await startPreparing(token, orderId);
+      toast.success("Preparation started for order!", "Preparation Started");
       await loadKDSData();
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to start preparation.");
+      const msg = e.message || "Failed to start preparation.";
+      setErrorMsg(msg);
+      toast.error(msg, "KDS Error");
     } finally {
       setActionLoading(null);
     }
@@ -117,10 +125,13 @@ function KitchenDashboardPage() {
       if (!token) return;
 
       await markOrderReady(token, orderId);
+      toast.success("Order marked READY for serving!", "Order Ready");
       await loadKDSData();
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to mark order ready.");
+      const msg = e.message || "Failed to mark order ready.";
+      setErrorMsg(msg);
+      toast.error(msg, "KDS Error");
     } finally {
       setActionLoading(null);
     }
@@ -133,10 +144,13 @@ function KitchenDashboardPage() {
       if (!token) return;
 
       await markOrderCompleted(token, orderId);
+      toast.success("Order marked COMPLETED!", "Order Completed");
       await loadKDSData();
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to complete order.");
+      const msg = e.message || "Failed to complete order.";
+      setErrorMsg(msg);
+      toast.error(msg, "KDS Error");
     } finally {
       setActionLoading(null);
     }
@@ -150,10 +164,13 @@ function KitchenDashboardPage() {
       if (!token) return;
 
       await pauseOrder(token, orderId, reason || undefined);
+      toast.warning("Order preparation PAUSED.", "Order Paused");
       await loadKDSData();
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to pause order.");
+      const msg = e.message || "Failed to pause order.";
+      setErrorMsg(msg);
+      toast.error(msg, "KDS Error");
     } finally {
       setActionLoading(null);
     }

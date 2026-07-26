@@ -8,8 +8,10 @@ import { cancelOrder, fetchSessionOrders, OrderOut, placeOrder, updateOrder } fr
 import { useCartStore } from "@/store/use-cart-store";
 import { fetchSessionBill, requestBill, BillData } from "@/services/billing";
 import { getSafeImageUrl } from "@/lib/utils";
+import { useToast } from "@/context/ToastContext";
 
 export default function CustomerSeatedMenuPage() {
+  const toast = useToast();
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionStatus, setSessionStatus] = useState<GuestStatusResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -154,11 +156,14 @@ export default function CustomerSeatedMenuPage() {
       await placeOrder(sessionToken, payloadItems);
       clearCart();
       setIsCartOpen(false);
+      toast.success("🎉 Order submitted to kitchen successfully!", "Order Placed");
       await loadSessionOrders();
       setIsOrdersOpen(true);
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to place order.");
+      const msg = e.message || "Failed to place order.";
+      setErrorMsg(msg);
+      toast.error(msg, "Order Failed");
     } finally {
       setSubmitting(false);
     }
