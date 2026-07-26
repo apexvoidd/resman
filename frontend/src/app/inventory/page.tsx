@@ -30,7 +30,8 @@ function InventoryPage() {
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
 
-  const isAuthorized = hasRole("kitchen_staff") || hasRole("manager") || hasRole("admin");
+  const isAuthorized =
+    hasRole("kitchen", "kitchen_staff", "chef", "manager", "admin");
 
   // State
   const [dashboard, setDashboard] = useState<InventoryDashboardOut | null>(null);

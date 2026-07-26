@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
-from app.models.staff import User
+from app.models.staff import Role, User, UserRole
 
 logger = logging.getLogger("app.services.user_sync")
 
@@ -33,6 +33,38 @@ async def _fetch_clerk_user(clerk_user_id: str) -> dict[str, Any]:
         return response.json()
 
 
+async def _assign_default_role_by_email(db: AsyncSession, user: User) -> None:
+    """Helper to assign initial system role to synced users based on email prefix if they have no roles."""
+    existing_roles = await db.execute(
+        select(UserRole).where(UserRole.user_id == user.id)
+    )
+    if existing_roles.scalars().all():
+        return
+
+    email_lower = user.email.lower()
+    target_code = None
+    if "admin" in email_lower:
+        target_code = "admin"
+    elif "manager" in email_lower:
+        target_code = "manager"
+    elif "cashier" in email_lower:
+        target_code = "cashier"
+    elif "kitchen" in email_lower or "chef" in email_lower:
+        target_code = "kitchen"
+    elif "waiter" in email_lower:
+        target_code = "waiter"
+    elif "clean" in email_lower:
+        target_code = "cleaning_staff"
+
+    if target_code:
+        role_res = await db.execute(select(Role).where(Role.code == target_code))
+        role = role_res.scalar_one_or_none()
+        if role:
+            db.add(UserRole(user_id=user.id, role_id=role.id, branch_id=None))
+            await db.commit()
+            logger.info("Auto-assigned role %s to user %s (%s)", target_code, user.id, user.email)
+
+
 async def get_or_create_user(
     db: AsyncSession,
     clerk_user_id: str,
@@ -41,7 +73,7 @@ async def get_or_create_user(
     """
     Look up the local user by clerk_user_id.
     If not found, fetch from Clerk API and create a local record.
-    If no superadmin exists in the system yet, promote the first user to superadmin.
+    Promotes the first user or explicitly designated admin account to superadmin.
     """
     # Check if any superadmin exists in the DB
     superadmin_count = await db.execute(
@@ -56,10 +88,12 @@ async def get_or_create_user(
     user: User | None = result.scalar_one_or_none()
 
     if user is not None:
-        if not has_superadmin or (settings.APP_ENV == "development" and not user.is_superadmin):
-            user.is_superadmin = True
-            await db.commit()
-            await db.refresh(user)
+        if not has_superadmin or user.email == "admin@restaurant.com":
+            if not user.is_superadmin:
+                user.is_superadmin = True
+                await db.commit()
+                await db.refresh(user)
+        await _assign_default_role_by_email(db, user)
         return user
 
     # 2. User does not exist locally — fetch from Clerk
@@ -97,17 +131,18 @@ async def get_or_create_user(
         if user.deleted_at is not None:
             user.deleted_at = None
             user.is_active = True
-        if not has_superadmin:
+        if not has_superadmin or primary_email == "admin@restaurant.com":
             user.is_superadmin = True
         await db.commit()
         await db.refresh(user)
+        await _assign_default_role_by_email(db, user)
         return user
 
     # 4. Create a brand-new local user record
     is_admin = (
         clerk_user_id == "dev_admin_user_01"
-        or settings.APP_ENV == "development"
         or not has_superadmin
+        or primary_email == "admin@restaurant.com"
     )
     user = User(
         email=primary_email,
@@ -121,6 +156,6 @@ async def get_or_create_user(
     db.add(user)
     await db.commit()
     await db.refresh(user)
+    await _assign_default_role_by_email(db, user)
     logger.info("Created local user %s for Clerk ID %s (is_superadmin=%s)", user.id, clerk_user_id, is_admin)
     return user
-

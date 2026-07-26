@@ -567,7 +567,7 @@ async def record_waste(
         u_res = await db.execute(select(User).where(User.id == user_id))
         user_obj = u_res.scalar_one_or_none()
         if user_obj:
-            user_name = user_obj.name or user_obj.email
+            user_name = user_obj.full_name
 
     return WasteRecordOut(
         id=waste_rec.id,

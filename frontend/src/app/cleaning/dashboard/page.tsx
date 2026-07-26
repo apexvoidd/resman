@@ -46,7 +46,7 @@ function CleaningDashboardPage() {
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
 
   const isAuthorized =
-    hasRole("cleaning_staff") || hasRole("manager") || hasRole("admin");
+    hasRole("cleaning_staff", "cleaner", "housekeeping", "manager", "admin");
 
   const loadTables = async () => {
     try {
@@ -257,7 +257,7 @@ function CleaningDashboardPage() {
 
 export default function CleaningDashboardWrapper() {
   return (
-    <RouteGuard roles={["cleaning_staff", "manager", "admin"]}>
+    <RouteGuard roles={["cleaning_staff", "cleaner", "housekeeping", "manager", "admin"]}>
       <CleaningDashboardPage />
     </RouteGuard>
   );

@@ -1,27 +1,22 @@
 /**
- * useRBAC — thin hook for client-side role/permission checks.
+ * useRBAC — thin hook for client-side role/permission checks and designated landing routing.
  *
  * This hook queries the backend /api/v1/auth/users/me/roles endpoint
- * and exposes helpers for checking roles and permissions in components.
- *
- * Usage:
- *   const { hasRole, hasPermission, roles, isLoading } = useRBAC();
- *   if (hasRole("admin")) { ... }
- *   if (hasPermission("menu:edit")) { ... }
+ * and exposes helpers for checking roles, permissions, and designated dashboard routes.
  */
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 
-interface Permission {
+export interface Permission {
   id: string;
   name: string;
   code: string;
   module: string;
 }
 
-interface Role {
+export interface Role {
   id: string;
   name: string;
   code: string;
@@ -29,7 +24,7 @@ interface Role {
   permissions: Permission[];
 }
 
-interface UserRolesResponse {
+export interface UserRolesResponse {
   user_id: string;
   is_superadmin: boolean;
   roles: Role[];
@@ -42,6 +37,34 @@ async function fetchMyRoles(token: string): Promise<UserRolesResponse> {
   });
   if (!res.ok) throw new Error("Failed to fetch user roles");
   return res.json();
+}
+
+/**
+ * Returns the designated landing dashboard URL for a given set of roles.
+ */
+export function getDesignatedDashboard(roles: Role[], isSuperadmin: boolean): string {
+  if (isSuperadmin) return "/manager/dashboard";
+
+  const roleCodes = new Set(roles.map((r) => r.code.toLowerCase()));
+
+  if (roleCodes.has("admin") || roleCodes.has("manager")) {
+    return "/manager/dashboard";
+  }
+  if (roleCodes.has("waiter")) {
+    return "/waiter/dashboard";
+  }
+  if (roleCodes.has("kitchen") || roleCodes.has("kitchen_staff") || roleCodes.has("chef")) {
+    return "/kitchen/dashboard";
+  }
+  if (roleCodes.has("cashier")) {
+    return "/cashier";
+  }
+  if (roleCodes.has("cleaning_staff") || roleCodes.has("cleaner") || roleCodes.has("housekeeping")) {
+    return "/cleaning/dashboard";
+  }
+
+  // Default fallback if user has no matching staff role
+  return "/manager/dashboard";
 }
 
 export function useRBAC() {
@@ -61,10 +84,12 @@ export function useRBAC() {
   const isSuperadmin = data?.is_superadmin ?? false;
   const roles = data?.roles ?? [];
 
-  const roleCodes = new Set(roles.map((r) => r.code));
+  const roleCodes = new Set(roles.map((r) => r.code.toLowerCase()));
   const permissionCodes = new Set(
-    roles.flatMap((r) => r.permissions.map((p) => p.code))
+    roles.flatMap((r) => r.permissions.map((p) => p.code.toLowerCase()))
   );
+
+  const designatedDashboard = getDesignatedDashboard(roles, isSuperadmin);
 
   return {
     /** True if roles/permissions are still loading */
@@ -75,17 +100,23 @@ export function useRBAC() {
     roles,
     /** True if the user has the superadmin flag */
     isSuperadmin,
+    /** Designated dashboard for the user's primary role */
+    designatedDashboard,
     /**
      * Returns true if the user has at least one of the specified role codes.
      * Superadmin always returns true.
      */
-    hasRole: (...codes: string[]) =>
-      isSuperadmin || codes.some((c) => roleCodes.has(c)),
+    hasRole: (...codes: string[]) => {
+      if (isSuperadmin) return true;
+      return codes.some((c) => roleCodes.has(c.toLowerCase()));
+    },
     /**
      * Returns true if the user has the specified permission code.
      * Superadmin always returns true.
      */
-    hasPermission: (code: string) =>
-      isSuperadmin || permissionCodes.has(code),
+    hasPermission: (code: string) => {
+      if (isSuperadmin) return true;
+      return permissionCodes.has(code.toLowerCase());
+    },
   };
 }

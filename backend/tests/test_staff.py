@@ -12,6 +12,7 @@ from app.services.staff import create_staff
 async def test_create_staff_reactivates_soft_deleted_email():
     """Verify that creating a staff member with a soft-deleted email re-activates and updates the record."""
     mock_db = AsyncMock()
+    mock_db.add = MagicMock()
 
     # Mock role lookup
     mock_role = MagicMock()

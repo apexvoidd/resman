@@ -36,7 +36,7 @@ router = APIRouter(prefix="/inventory", tags=["Inventory Management"])
     status_code=status.HTTP_200_OK,
 )
 async def get_inventory_dashboard(
-    _: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    _: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Retrieve total ingredients count, low stock count, out of stock count, and total valuation."""
@@ -50,7 +50,7 @@ async def get_inventory_dashboard(
     status_code=status.HTTP_200_OK,
 )
 async def get_categories(
-    _: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    _: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Retrieve list of all ingredient categories."""
@@ -65,7 +65,7 @@ async def get_categories(
 )
 async def create_category(
     payload: IngredientCategoryCreate,
-    _: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    _: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Create a new ingredient category."""
@@ -84,7 +84,7 @@ async def get_ingredients(
     stock_status: str | None = Query(None, description="Filter by stock status: all, in_stock, low_stock, out_of_stock"),
     is_active: bool | None = Query(None, description="Filter by active status"),
     sort_by: str | None = Query("name", description="Sort by: name, stock_asc, stock_desc, cost"),
-    _: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    _: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """List ingredients with search, category filtering, stock alert filter, and sorting."""
@@ -106,7 +106,7 @@ async def get_ingredients(
 )
 async def create_ingredient(
     payload: IngredientCreate,
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Add a new ingredient with non-duplicate name check and initial stock audit logging."""
@@ -121,7 +121,7 @@ async def create_ingredient(
 )
 async def get_ingredient_by_id(
     ingredient_id: uuid.UUID,
-    _: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    _: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Get single ingredient details by ID."""
@@ -137,7 +137,7 @@ async def get_ingredient_by_id(
 async def update_ingredient(
     ingredient_id: uuid.UUID,
     payload: IngredientUpdate,
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Edit ingredient configuration details."""
@@ -153,7 +153,7 @@ async def update_ingredient(
 async def toggle_ingredient_status(
     ingredient_id: uuid.UUID,
     is_active: bool = Query(..., description="Set active status"),
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Enable or disable an ingredient."""
@@ -171,7 +171,7 @@ async def toggle_ingredient_status(
 async def restock_ingredient(
     ingredient_id: uuid.UUID,
     payload: RestockInput,
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Restock ingredient stock with purchase tracking and locking conflict protection."""
@@ -189,7 +189,7 @@ async def restock_ingredient(
 async def adjust_stock(
     ingredient_id: uuid.UUID,
     payload: ManualAdjustmentInput,
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Manual stock adjustment (Increase or Decrease) with required reason."""
@@ -207,7 +207,7 @@ async def adjust_stock(
 async def record_waste(
     ingredient_id: uuid.UUID,
     payload: WasteRecordInput,
-    current_user: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    current_user: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Record ingredient waste, decrease stock, and log cost impact."""
@@ -225,7 +225,7 @@ async def record_waste(
 async def get_stock_history(
     ingredient_id: uuid.UUID | None = Query(None, description="Optional filter by ingredient ID"),
     limit: int = Query(100, ge=1, le=500, description="Limit history records"),
-    _: User = Depends(require_role(["kitchen_staff", "manager", "admin"])),
+    _: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Retrieve chronological audit history of all inventory stock changes."""

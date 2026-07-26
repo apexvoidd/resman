@@ -1,10 +1,7 @@
-import { UserButton } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
+import { HomeStaffHeaderAction } from "@/components/HomeStaffRedirect";
 import Link from "next/link";
 
-export default async function HomePage() {
-  const { userId } = await auth();
-
+export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#0F172A] text-[#F8FAFC] flex flex-col justify-between p-6 sm:p-10 border-t-4 border-[#2563EB]">
       {/* Header Bar */}
@@ -17,24 +14,7 @@ export default async function HomePage() {
         </div>
 
         <div>
-          {userId ? (
-            <div className="flex items-center space-x-3 bg-[#1E293B] border border-[#334155] px-3.5 py-1.5 rounded-lg shadow-sm">
-              <UserButton />
-              <Link
-                href="/manager/dashboard"
-                className="text-xs font-semibold text-[#2563EB] hover:underline transition"
-              >
-                Manager Hub ➔
-              </Link>
-            </div>
-          ) : (
-            <Link
-              href="/sign-in"
-              className="px-4 py-2 rounded-lg bg-[#334155] hover:bg-[#475569] border border-[#475569] text-xs font-semibold text-[#F8FAFC] transition shadow-sm"
-            >
-              Office / Staff Login ➔
-            </Link>
-          )}
+          <HomeStaffHeaderAction />
         </div>
       </header>
 

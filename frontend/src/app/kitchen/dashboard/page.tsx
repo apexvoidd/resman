@@ -36,7 +36,8 @@ function KitchenDashboardPage() {
   const [prepMinutes, setPrepMinutes] = useState<number>(15);
   const [updatingTimeOrderId, setUpdatingTimeOrderId] = useState<string | null>(null);
 
-  const isAuthorized = hasRole("kitchen_staff") || hasRole("manager") || hasRole("admin");
+  const isAuthorized =
+    hasRole("kitchen", "kitchen_staff", "chef", "manager", "admin");
   const isManager = hasRole("manager") || hasRole("admin");
 
   const loadKDSData = async () => {
@@ -632,7 +633,7 @@ function KitchenDashboardPage() {
 
 export default function KitchenDashboardWrapper() {
   return (
-    <RouteGuard roles={["kitchen", "manager", "admin"]}>
+    <RouteGuard roles={["kitchen", "kitchen_staff", "chef", "manager", "admin"]}>
       <KitchenDashboardPage />
     </RouteGuard>
   );

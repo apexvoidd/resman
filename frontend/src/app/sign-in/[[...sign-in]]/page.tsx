@@ -77,6 +77,8 @@ export default function SignInPage() {
         {/* Styled High-Contrast Sign-In Card Container */}
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-2 sm:p-4 shadow-2xl backdrop-blur-xl">
           <SignIn
+            fallbackRedirectUrl="/redirect"
+            forceRedirectUrl="/redirect"
             appearance={{
               elements: {
                 card: "bg-slate-900 border-none shadow-none text-slate-100 p-4 sm:p-6",

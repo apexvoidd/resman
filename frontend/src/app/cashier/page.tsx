@@ -32,7 +32,7 @@ interface Bill {
   items: BillItem[];
 }
 
-export default function CashierPOSPage() {
+function CashierPOSPage() {
   const { getToken } = useAuth();
   const { isLoading: rbacLoading, hasRole } = useRBAC();
 
@@ -521,6 +521,14 @@ export default function CashierPOSPage() {
           )}
         </div>
       </div>
+    </RouteGuard>
+  );
+}
+
+export default function CashierPOSPageWrapper() {
+  return (
+    <RouteGuard roles={["cashier", "manager", "admin"]}>
+      <CashierPOSPage />
     </RouteGuard>
   );
 }
