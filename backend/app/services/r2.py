@@ -116,7 +116,10 @@ async def _save_locally(file_data: bytes, content_type: str, folder: str) -> str
     with open(file_path, "wb") as f:
         f.write(file_data)
 
-    host = f"http://localhost:{settings.PORT}" if settings.PORT else "http://localhost:8000"
+    if settings.PUBLIC_BASE_URL:
+        host = settings.PUBLIC_BASE_URL.rstrip("/")
+    else:
+        host = f"http://localhost:{settings.PORT}" if settings.PORT else "http://localhost:8000"
     public_url = f"{host}/uploads/{folder}/{filename}"
     logger.info("Saved image locally to %s -> %s", file_path, public_url)
     return public_url
