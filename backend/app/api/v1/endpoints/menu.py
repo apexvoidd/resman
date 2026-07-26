@@ -216,16 +216,10 @@ async def upload_menu_image(
     file: UploadFile = File(...),
     _: User = Depends(require_role(["admin", "manager"])),
 ) -> dict[str, str]:
-    """Upload dish image to Cloudflare R2 object storage."""
-    allowed_types = ["image/jpeg", "image/png", "image/webp", "image/avif"]
-    if file.content_type not in allowed_types:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only JPEG, PNG, WEBP, and AVIF image files are allowed.",
-        )
-
+    """Upload dish image to Cloudflare R2 object storage (or local fallback)."""
     image_url = await upload_file_to_r2(
         file=file,
         folder="menu-items",
     )
     return {"image_url": image_url}
+

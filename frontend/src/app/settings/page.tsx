@@ -273,7 +273,7 @@ function SettingsPage() {
                     {uploadingLogo ? "Uploading..." : "Upload New Logo"}
                     <input
                       type="file"
-                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      accept="image/*"
                       className="hidden"
                       onChange={handleLogoUpload}
                       disabled={uploadingLogo}

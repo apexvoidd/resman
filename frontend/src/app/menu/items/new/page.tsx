@@ -233,7 +233,7 @@ export default function AddMenuItemPage() {
             <div className="mt-2 flex flex-col sm:flex-row items-center gap-4">
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/avif"
+                accept="image/*"
                 onChange={handleImageUpload}
                 disabled={uploadingImage}
                 className="block w-full text-xs text-gray-400 file:mr-4 file:rounded-xl file:border-0 file:bg-gray-800 file:px-4 file:py-2.5 file:text-xs file:font-semibold file:text-white hover:file:bg-gray-700"

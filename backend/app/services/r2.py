@@ -6,6 +6,7 @@ R2 endpoint format: https://<account_id>.r2.cloudflarestorage.com
 
 import logging
 import mimetypes
+from pathlib import Path
 import uuid
 
 import aioboto3
@@ -16,8 +17,25 @@ from app.config.settings import settings
 
 logger = logging.getLogger("app.services.r2")
 
-# Only allow safe image formats
-_ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+# Base upload directory for local fallback (absolute path relative to backend root)
+BASE_UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
+
+# Allowed mime types and normalization mapping
+_MIME_NORMALIZATION = {
+    "image/jpg": "image/jpeg",
+    "image/pjpeg": "image/jpeg",
+    "image/x-png": "image/png",
+}
+
+_ALLOWED_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "image/avif",
+    "image/svg+xml",
+}
+
 _MAX_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
@@ -31,60 +49,75 @@ def _is_r2_configured() -> bool:
         and settings.R2_ACCESS_KEY_ID
         and settings.R2_SECRET_ACCESS_KEY
         and settings.R2_BUCKET_NAME
+        and not settings.R2_ACCOUNT_ID.startswith("your-")
     )
 
 
-from pathlib import Path
+async def _save_locally(file_data: bytes, content_type: str, folder: str) -> str:
+    """Save file bytes locally and return public URL."""
+    upload_dir = BASE_UPLOAD_DIR / folder
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    ext = mimetypes.guess_extension(content_type) or ".jpg"
+    ext = ext.replace(".jpe", ".jpg").replace(".jpeg", ".jpg")
+    if content_type == "image/svg+xml":
+        ext = ".svg"
+    elif content_type == "image/avif":
+        ext = ".avif"
+
+    filename = f"{uuid.uuid4().hex}{ext}"
+    file_path = upload_dir / filename
+
+    with open(file_path, "wb") as f:
+        f.write(file_data)
+
+    host = f"http://localhost:{settings.PORT}" if settings.PORT else "http://localhost:8000"
+    public_url = f"{host}/uploads/{folder}/{filename}"
+    logger.info("Saved image locally to %s -> %s", file_path, public_url)
+    return public_url
+
 
 async def upload_file_to_r2(file: UploadFile, folder: str = "uploads") -> str:
     """
     Validate and upload an image file to Cloudflare R2 under a specific folder.
-    Falls back to local file storage when R2 is not configured.
+    Falls back to local file storage when R2 is not configured or if R2 upload fails.
     """
-    if not _is_r2_configured():
-        # Local file storage fallback
-        upload_dir = Path("uploads") / folder
-        upload_dir.mkdir(parents=True, exist_ok=True)
+    # ── Read file content first ───────────────────────────────────────────────
+    data = await file.read()
 
-        content_type = file.content_type or "image/jpeg"
-        ext = mimetypes.guess_extension(content_type) or ".jpg"
-        ext = ext.replace(".jpe", ".jpg")
-        filename = f"{uuid.uuid4().hex}{ext}"
-        file_path = upload_dir / filename
+    # ── Validate & normalize content type ────────────────────────────────────
+    raw_content_type = (file.content_type or "").lower().strip()
+    content_type = _MIME_NORMALIZATION.get(raw_content_type, raw_content_type)
 
-        data = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(data)
-
-        host = f"http://localhost:{settings.PORT}" if settings.PORT else "http://localhost:8000"
-        public_url = f"{host}/uploads/{folder}/{filename}"
-        logger.info("Saved image locally to %s -> %s", file_path, public_url)
-        return public_url
-
-    # ── Validate content type ─────────────────────────────────────────────────
-    content_type = file.content_type or ""
-    if content_type not in _ALLOWED_TYPES:
+    if not content_type or content_type not in _ALLOWED_TYPES:
+        allowed_str = "JPEG, PNG, WebP, GIF, AVIF, SVG"
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type '{content_type}'. Allowed: {', '.join(_ALLOWED_TYPES)}",
+            detail=f"Unsupported file type '{file.content_type}'. Allowed types: {allowed_str}.",
         )
 
-    # ── Read & size-check ─────────────────────────────────────────────────────
-    data = await file.read()
+    # ── Check size ────────────────────────────────────────────────────────────
     if len(data) > _MAX_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File must be ≤ {_MAX_SIZE_BYTES // (1024 * 1024)} MB.",
+            detail=f"File size exceeds limit ({_MAX_SIZE_BYTES // (1024 * 1024)} MB max).",
         )
 
-    # ── Build a unique object key ─────────────────────────────────────────────
+    if not _is_r2_configured():
+        return await _save_locally(data, content_type, folder)
+
+    # ── Build unique object key ───────────────────────────────────────────────
     ext = mimetypes.guess_extension(content_type) or ".jpg"
-    ext = ext.replace(".jpe", ".jpg")  # normalize .jpe → .jpg
+    ext = ext.replace(".jpe", ".jpg").replace(".jpeg", ".jpg")
+    if content_type == "image/svg+xml":
+        ext = ".svg"
+    elif content_type == "image/avif":
+        ext = ".avif"
     object_key = f"{folder}/{uuid.uuid4().hex}{ext}"
 
-    # ── Upload via aioboto3 ───────────────────────────────────────────────────
-    session = aioboto3.Session()
+    # ── Upload via aioboto3 with fallback to local ────────────────────────────
     try:
+        session = aioboto3.Session()
         async with session.client(
             "s3",
             endpoint_url=_r2_endpoint(),
@@ -100,24 +133,20 @@ async def upload_file_to_r2(file: UploadFile, folder: str = "uploads") -> str:
                 ContentType=content_type,
                 CacheControl="public, max-age=31536000",
             )
+
+        if settings.R2_PUBLIC_DOMAIN:
+            public_url = f"https://{settings.R2_PUBLIC_DOMAIN.rstrip('/')}/{object_key}"
+        else:
+            public_url = f"{_r2_endpoint()}/{settings.R2_BUCKET_NAME}/{object_key}"
+
+        logger.info("File uploaded to R2: %s", public_url)
+        return public_url
     except Exception as exc:
-        logger.error("R2 upload failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="File upload failed. Please try again later.",
-        ) from exc
-
-    # ── Return public URL ─────────────────────────────────────────────────────
-    if settings.R2_PUBLIC_DOMAIN:
-        public_url = f"https://{settings.R2_PUBLIC_DOMAIN.rstrip('/')}/{object_key}"
-    else:
-        # Fallback to direct R2 URL (requires bucket public access)
-        public_url = f"{_r2_endpoint()}/{settings.R2_BUCKET_NAME}/{object_key}"
-
-    logger.info("File uploaded: %s", public_url)
-    return public_url
+        logger.warning("R2 upload failed (%s). Falling back to local file storage.", exc)
+        return await _save_locally(data, content_type, folder)
 
 
 async def upload_logo(file: UploadFile) -> str:
-    """Upload logo image to Cloudflare R2."""
+    """Upload logo image to Cloudflare R2 (or local fallback)."""
     return await upload_file_to_r2(file, folder="logos")
+

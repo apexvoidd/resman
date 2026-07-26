@@ -63,9 +63,9 @@ def create_app() -> FastAPI:
     # Mount static files for local upload fallback
     from pathlib import Path
     from fastapi.staticfiles import StaticFiles
-    upload_dir = Path("uploads")
-    upload_dir.mkdir(exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+    upload_dir = Path(__file__).resolve().parent.parent / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
 
     return app
 
