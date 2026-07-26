@@ -16,15 +16,18 @@ from app.config.settings import settings
 logger = logging.getLogger("app.security")
 
 
+def _get_jwks_url() -> str:
+    if settings.CLERK_JWKS_URL:
+        return settings.CLERK_JWKS_URL
+    if settings.CLERK_ISSUER:
+        return f"{settings.CLERK_ISSUER.rstrip('/')}/.well-known/jwks.json"
+    return ""
+
+
 @lru_cache(maxsize=1)
-def _get_jwks_client() -> PyJWKClient:
-    """Returns a cached JWKS client. Called once per process lifetime."""
-    if not settings.CLERK_JWKS_URL:
-        raise RuntimeError(
-            "CLERK_JWKS_URL is not configured. "
-            "Set it to https://<your-clerk-instance>.clerk.accounts.dev/.well-known/jwks.json"
-        )
-    return PyJWKClient(settings.CLERK_JWKS_URL)
+def _get_jwks_client(jwks_url: str) -> PyJWKClient:
+    """Returns a cached JWKS client."""
+    return PyJWKClient(jwks_url)
 
 
 def verify_clerk_token(token: str) -> dict:
@@ -32,12 +35,21 @@ def verify_clerk_token(token: str) -> dict:
     Verify a Clerk-issued Bearer token and return decoded JWT claims.
 
     Claims include:
-        sub  — Clerk user ID (e.g. "user_2abc...")
-        iss  — Clerk issuer domain
+        sub   — Clerk user ID (e.g. "user_2abc...")
+        iss   — Clerk issuer domain
         email — from public metadata (if configured as session claim)
     """
+    jwks_url = _get_jwks_url()
+    if not jwks_url:
+        logger.warning("Clerk JWKS URL is not configured.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication server configuration missing on backend.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     try:
-        client = _get_jwks_client()
+        client = _get_jwks_client(jwks_url)
         signing_key = client.get_signing_key_from_jwt(token)
         payload: dict = jwt.decode(
             token,
@@ -56,6 +68,8 @@ def verify_clerk_token(token: str) -> dict:
 
         return payload
 
+    except HTTPException:
+        raise
     except PyJWTError as exc:
         logger.warning("JWT verification failed: %s", str(exc))
         raise HTTPException(
@@ -63,3 +77,11 @@ def verify_clerk_token(token: str) -> dict:
             detail="Invalid or expired authentication token.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    except Exception as exc:
+        logger.error("Unexpected error during Clerk JWT verification: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not verify authentication token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+

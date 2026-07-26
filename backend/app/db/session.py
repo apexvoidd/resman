@@ -2,16 +2,63 @@ from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.config.settings import settings
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
+from app.config.settings import settings
 from app.models.base import BaseModel
 
-kwargs = {"echo": settings.DB_ECHO, "future": True}
-if not settings.DATABASE_URL.startswith("sqlite"):
+
+def get_async_db_url_and_args(raw_url: str) -> tuple[str, dict]:
+    """
+    Format DATABASE_URL for asyncpg compatibility:
+    1. Converts postgres:// / postgresql:// to postgresql+asyncpg://
+    2. Removes sslmode query parameter (asyncpg raises TypeError on sslmode kwarg)
+    3. Converts sslmode parameter to connect_args={'ssl': True}
+    """
+    if not raw_url or raw_url.startswith("sqlite"):
+        return raw_url, {}
+
+    url = raw_url
+    if url.startswith("postgres://"):
+        url = "postgresql+asyncpg://" + url[len("postgres://"):]
+    elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+
+    parsed = urlparse(url)
+    query_params = parse_qs(parsed.query)
+
+    sslmode = query_params.pop("sslmode", None)
+    new_query = urlencode(query_params, doseq=True)
+
+    cleaned_url = urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        parsed.path,
+        parsed.params,
+        new_query,
+        parsed.fragment
+    ))
+
+    connect_args = {}
+    if sslmode:
+        mode = sslmode[0] if isinstance(sslmode, list) else sslmode
+        if mode in ("require", "prefer", "verify-ca", "verify-full", "true", "1"):
+            connect_args["ssl"] = True
+
+    return cleaned_url, connect_args
+
+
+db_url, connect_args = get_async_db_url_and_args(settings.DATABASE_URL)
+
+kwargs: dict = {"echo": settings.DB_ECHO, "future": True}
+if connect_args:
+    kwargs["connect_args"] = connect_args
+
+if not db_url.startswith("sqlite"):
     kwargs["pool_size"] = settings.DB_POOL_SIZE
     kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
 
-engine = create_async_engine(settings.DATABASE_URL, **kwargs)
+engine = create_async_engine(db_url, **kwargs)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

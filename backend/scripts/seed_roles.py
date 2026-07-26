@@ -188,15 +188,13 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
 
 async def seed() -> None:
     import app.models  # noqa: F401
+    from app.db.session import AsyncSessionLocal, engine
     from app.models.base import BaseModel
 
-    engine = create_async_engine(settings.DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(BaseModel.metadata.create_all)
 
-    Session = async_sessionmaker(engine, expire_on_commit=False)
-
-    async with Session() as session:
+    async with AsyncSessionLocal() as session:
         print("🌱 Seeding roles and permissions...")
 
         # Upsert permissions
