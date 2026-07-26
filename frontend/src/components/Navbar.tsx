@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 
 export function Navbar() {
   const { isSignedIn, isLoaded } = useUser();
-  const { hasRole, hasPermission, roles, isSuperadmin } = useRBAC();
+  const { hasRole, hasPermission, roles, isSuperadmin, designatedDashboard } = useRBAC();
   const pathname = usePathname();
 
   // Hide nav bar entirely on guest entrance / join pages for customer experience
@@ -21,8 +21,8 @@ export function Navbar() {
 
   const navLinks = [
     {
-      href: "/",
-      label: "Home",
+      href: designatedDashboard || "/",
+      label: "Workspace",
       icon: "🏠",
       show: true,
     },
@@ -112,7 +112,7 @@ export function Navbar() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6">
         {/* Brand logo & active role badge */}
         <div className="flex items-center space-x-3">
-          <Link href="/" className="flex items-center space-x-2 text-white hover:opacity-90">
+          <Link href={designatedDashboard || "/"} className="flex items-center space-x-2 text-white hover:opacity-90">
             <span className="text-xl">🍽️</span>
             <span className="text-sm font-bold tracking-tight text-slate-100 hidden sm:inline">
               ResMan OS

@@ -3,20 +3,10 @@
 import { useRBAC } from "@/hooks/use-rbac";
 import { UserButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 
 export function HomeStaffHeaderAction() {
   const { isSignedIn, isLoaded } = useAuth();
-  const { isLoading: isRbacLoading, designatedDashboard } = useRBAC();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isLoaded && isSignedIn && !isRbacLoading && designatedDashboard) {
-      // Auto-redirect signed-in staff from home page to their designated workspace
-      router.replace(designatedDashboard);
-    }
-  }, [isLoaded, isSignedIn, isRbacLoading, designatedDashboard, router]);
+  const { designatedDashboard } = useRBAC();
 
   if (!isLoaded) return null;
 
