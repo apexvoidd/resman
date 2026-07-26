@@ -50,6 +50,17 @@ export default function BillingPage() {
     }
   }, [billId]);
 
+  // Live polling interval so customer screen updates automatically when cashier settles bill
+  useEffect(() => {
+    if (!billId || bill?.status === "paid") return;
+
+    const interval = setInterval(() => {
+      pollBillData();
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [billId, bill?.status]);
+
   // Load Razorpay checkout script
   useEffect(() => {
     const script = document.createElement("script");
@@ -72,6 +83,21 @@ export default function BillingPage() {
       setErrorMsg(e.message || "Failed to load bill.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const pollBillData = async () => {
+    if (!billId) return;
+    try {
+      const data = await getBill(billId);
+      setBill((prev) => {
+        if (prev && prev.status !== "paid" && data.status === "paid") {
+          setSuccessMsg("Payment Confirmed & Settled by Cashier! 🎉 Thank you for dining with us.");
+        }
+        return data;
+      });
+    } catch {
+      // Ignore background polling errors
     }
   };
 
