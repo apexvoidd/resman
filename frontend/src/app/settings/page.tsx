@@ -1,5 +1,6 @@
 "use client";
 
+import { RouteGuard } from "@/components/RouteGuard";
 import { useState, useEffect, ChangeEvent } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -30,7 +31,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-export default function SettingsPage() {
+function SettingsPage() {
   const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { hasRole, isLoading: isRbacLoading } = useRBAC();
   const isAdmin = hasRole("admin");
@@ -545,5 +546,13 @@ export default function SettingsPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPageWrapper() {
+  return (
+    <RouteGuard roles={["manager", "admin"]}>
+      <SettingsPage />
+    </RouteGuard>
   );
 }

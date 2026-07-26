@@ -42,6 +42,24 @@ async def get_kds_orders(
     )
 
 
+@router.get(
+    "/waiter-orders",
+    response_model=list[OrderOut],
+    summary="Get orders for waiter dashboard (active + completed-unbilled)",
+    status_code=status.HTTP_200_OK,
+)
+async def get_waiter_orders(
+    _: User = Depends(require_role(["waiter", "cashier", "manager", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """
+    Fetch orders for waiter dashboard.
+    Returns active orders + completed orders that don't yet have a paid bill.
+    Disappears from dashboard once bill is paid.
+    """
+    return await kds_service.get_waiter_active_orders(db)
+
+
 @router.post(
     "/orders/{order_id}/accept",
     response_model=OrderOut,

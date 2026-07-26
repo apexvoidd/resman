@@ -97,21 +97,25 @@ export default function JoinPage() {
     return () => clearInterval(interval);
   }, [cooldownTimer]);
 
-  // 4. Live Polling for Verification State Changes (every 3 seconds when awaiting verification)
+  // 4. Live Polling — runs when awaiting verification OR in queue
   useEffect(() => {
-    if (!sessionToken || statusData?.verification_status !== "awaiting_verification") return;
+    if (!sessionToken) return;
+    const isAwaiting = statusData?.verification_status === "awaiting_verification";
+    const isInQueue = statusData?.in_queue === true;
+    if (!isAwaiting && !isInQueue) return;
 
     const pollInterval = setInterval(() => {
       fetchGuestStatus(sessionToken)
         .then((res) => {
           setStatusData(res);
           if (res.remaining_seconds) setCountdown(res.remaining_seconds);
+          if (res.cooldown_remaining_seconds) setCooldownTimer(res.cooldown_remaining_seconds);
         })
         .catch(() => {});
     }, 3000);
 
     return () => clearInterval(pollInterval);
-  }, [sessionToken, statusData?.verification_status]);
+  }, [sessionToken, statusData?.verification_status, statusData?.in_queue]);
 
   const handleFindTable = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,10 +239,10 @@ export default function JoinPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-950 text-white">
+      <div className="flex min-h-screen items-center justify-center bg-[#FFF7ED] text-[#1E293B]">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
-          <p className="text-sm font-medium text-gray-400">Initializing Entrance QR Session...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#F97316] border-t-transparent" />
+          <p className="text-sm font-semibold text-[#EA580C]">Initializing Entrance QR Session...</p>
         </div>
       </div>
     );
@@ -252,46 +256,46 @@ export default function JoinPage() {
   const isRejected = statusData?.verification_status === "rejected";
 
   return (
-    <div className="min-h-screen bg-gray-950 px-4 py-8 text-gray-100 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#FFF7ED] px-4 py-8 text-[#1E293B] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-md">
         {/* Header */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-2xl font-bold text-amber-400 ring-1 ring-amber-500/20">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F97316]/10 text-2xl font-bold text-[#F97316] border border-[#F97316]/20 shadow-sm">
             🍽️
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Smart Entrance Check-In</h1>
-          <p className="mt-1 text-sm text-gray-400">Scan entrance QR & get instant table allocation</p>
+          <h1 className="text-2xl font-extrabold text-[#1E293B] tracking-tight">Smart Entrance Check-In</h1>
+          <p className="mt-1 text-sm text-[#EA580C] font-medium">Scan entrance QR & get instant table allocation</p>
         </div>
 
         {/* Error Alert */}
         {errorMsg && (
-          <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {errorMsg}
           </div>
         )}
 
         {/* Cooldown Alert */}
         {isCooldown && (
-          <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
             <span className="font-semibold">Cancellation Cooldown:</span> Please wait{" "}
-            <span className="font-mono font-bold text-white">{cooldownTimer ? formatTimer(cooldownTimer) : "5:00"}</span>{" "}
+            <span className="font-mono font-bold text-[#F97316]">{cooldownTimer ? formatTimer(cooldownTimer) : "5:00"}</span>{" "}
             before requesting another table.
           </div>
         )}
 
         {/* 1. ASSIGNED TABLE RESERVED STATE */}
         {hasReservation ? (
-          <div className="space-y-6 rounded-2xl border border-emerald-500/20 bg-gray-900/90 p-6 backdrop-blur shadow-xl">
+          <div className="space-y-6 rounded-2xl border border-orange-200 bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between">
               <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
                   isVerified
-                    ? "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20"
+                    ? "bg-emerald-100 text-emerald-700"
                     : isAwaiting
-                    ? "bg-amber-500/10 text-amber-400 ring-amber-500/20 animate-pulse"
+                    ? "bg-amber-100 text-amber-700 animate-pulse"
                     : isRejected
-                    ? "bg-red-500/10 text-red-400 ring-red-500/20"
-                    : "bg-blue-500/10 text-blue-400 ring-blue-500/20"
+                    ? "bg-red-100 text-red-700"
+                    : "bg-blue-100 text-blue-700"
                 }`}
               >
                 {isVerified
@@ -302,64 +306,63 @@ export default function JoinPage() {
                   ? "Verification Rejected"
                   : "Table Reserved"}
               </span>
-              <span className="text-xs text-gray-400">Entrance Assignment</span>
+              <span className="text-xs text-slate-500">Entrance Assignment</span>
             </div>
 
             <div className="text-center py-4">
-              <p className="text-xs uppercase tracking-wider text-gray-400">Your Assigned Table</p>
-              <div className="mt-2 text-6xl font-black tracking-tight text-emerald-400">
+              <p className="text-xs uppercase tracking-wider text-slate-500">Your Assigned Table</p>
+              <div className="mt-2 text-6xl font-black tracking-tight text-[#F97316]">
                 {statusData.table_number}
               </div>
-              <p className="mt-2 text-sm text-gray-300">
-                Capacity: <span className="font-semibold text-white">{statusData.capacity} Guests</span>
+              <p className="mt-2 text-sm text-slate-600">
+                Capacity: <span className="font-bold text-[#1E293B]">{statusData.capacity} Guests</span>
               </p>
             </div>
 
             {/* VERIFICATION STATE BANNERS */}
             {isVerified ? (
-              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-center">
-                <p className="text-sm font-semibold text-emerald-400">✅ Arrival Confirmed by Waiter</p>
-                <p className="mt-1 text-xs text-emerald-300">Welcome! Your digital menu access is unlocked.</p>
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-center">
+                <p className="text-sm font-semibold text-emerald-800">✅ Arrival Confirmed by Waiter</p>
+                <p className="mt-1 text-xs text-emerald-600">Welcome! Your digital menu access is unlocked.</p>
               </div>
             ) : isAwaiting ? (
-              <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 text-center animate-pulse">
-                <p className="text-sm font-semibold text-amber-400">⏳ Waiter Notified</p>
-                <p className="mt-1 text-xs text-amber-300">Staff will arrive at Table {statusData.table_number} shortly to verify.</p>
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-center animate-pulse">
+                <p className="text-sm font-semibold text-amber-800">⏳ Waiter Notified</p>
+                <p className="mt-1 text-xs text-amber-600">Staff will arrive at Table {statusData.table_number} shortly to verify.</p>
               </div>
             ) : isRejected ? (
-              <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-4 text-center">
-                <p className="text-sm font-semibold text-red-400">❌ Verification Rejected</p>
-                <p className="mt-1 text-xs text-red-300">
+              <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-center">
+                <p className="text-sm font-semibold text-red-800">❌ Verification Rejected</p>
+                <p className="mt-1 text-xs text-red-600">
                   {statusData.rejection_reason || "Staff could not locate your party at the table."}
                 </p>
               </div>
             ) : null}
 
-            {/* Countdown timer (show when not verified yet) */}
+            {/* Countdown timer */}
             {!isVerified && countdown !== null && countdown > 0 && (
-              <div className="rounded-xl bg-gray-950 p-4 text-center ring-1 ring-white/10">
-                <p className="text-xs text-gray-400">Reservation Expiration Timer</p>
-                <div className="my-1 font-mono text-3xl font-bold tracking-wider text-amber-400">
+              <div className="rounded-xl bg-[#FFF7ED] p-4 text-center border border-orange-200">
+                <p className="text-xs text-slate-500">Reservation Expiration Timer</p>
+                <div className="my-1 font-mono text-3xl font-bold tracking-wider text-[#F97316]">
                   {formatTimer(countdown)}
                 </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-800">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-orange-200">
                   <div
-                    className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all duration-1000"
+                    className="h-full bg-gradient-to-r from-orange-400 to-[#F97316] transition-all duration-1000"
                     style={{ width: `${(countdown / 300) * 100}%` }}
                   />
                 </div>
-                <p className="mt-2 text-xs text-gray-500">Please proceed to your table within 5 minutes</p>
+                <p className="mt-2 text-xs text-slate-500">Please proceed to your table within 5 minutes</p>
               </div>
             )}
 
             <div className="flex flex-col gap-3 pt-2">
-              {/* "I'm at my table" Action Button */}
               {!isVerified && !isAwaiting && (
                 <button
                   type="button"
                   onClick={handleImAtTable}
                   disabled={submitting}
-                  className="w-full rounded-xl bg-emerald-500 py-3.5 text-sm font-bold text-gray-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/10 disabled:opacity-50"
+                  className="w-full rounded-xl bg-[#F97316] py-3.5 text-sm font-bold text-white hover:bg-[#EA580C] transition shadow-lg shadow-orange-500/20 disabled:opacity-50"
                 >
                   {submitting ? "Notifying Staff..." : "📍 I'm at my Table"}
                 </button>
@@ -368,7 +371,7 @@ export default function JoinPage() {
               {isVerified && (
                 <Link
                   href="/join/menu"
-                  className="w-full text-center rounded-xl bg-emerald-500 py-3.5 text-sm font-bold text-gray-950 hover:bg-emerald-400 transition block shadow-lg shadow-emerald-500/10"
+                  className="w-full text-center rounded-xl bg-[#F97316] py-3.5 text-sm font-bold text-white hover:bg-[#EA580C] transition block shadow-lg shadow-orange-500/20"
                 >
                   📖 Browse Digital Menu & Place Order
                 </Link>
@@ -378,7 +381,7 @@ export default function JoinPage() {
                 type="button"
                 onClick={handleRefresh}
                 disabled={submitting}
-                className="w-full rounded-xl bg-gray-800 py-3 text-sm font-semibold text-white hover:bg-gray-700 transition disabled:opacity-50"
+                className="w-full rounded-xl bg-slate-100 py-3 text-sm font-semibold text-[#1E293B] hover:bg-slate-200 transition disabled:opacity-50 border border-slate-200"
               >
                 Refresh Status
               </button>
@@ -388,7 +391,7 @@ export default function JoinPage() {
                   type="button"
                   onClick={handleCancel}
                   disabled={submitting}
-                  className="w-full rounded-xl border border-red-500/20 bg-red-500/10 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/20 transition disabled:opacity-50"
+                  className="w-full rounded-xl border border-red-200 bg-red-50 py-3 text-sm font-semibold text-red-600 hover:bg-red-100 transition disabled:opacity-50"
                 >
                   Cancel Reservation
                 </button>
@@ -397,26 +400,26 @@ export default function JoinPage() {
           </div>
         ) : inQueue ? (
           /* 2. WAITING QUEUE STATE */
-          <div className="space-y-6 rounded-2xl border border-amber-500/20 bg-gray-900/90 p-6 backdrop-blur shadow-xl">
+          <div className="space-y-6 rounded-2xl border border-orange-200 bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between">
-              <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-400 ring-1 ring-amber-500/20">
+              <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
                 In Waitlist Queue
               </span>
-              <span className="text-xs text-gray-400">Walk-in Queue</span>
+              <span className="text-xs text-slate-500">Walk-in Queue</span>
             </div>
 
             <div className="text-center py-4">
-              <p className="text-xs uppercase tracking-wider text-gray-400">Your Position in Line</p>
-              <div className="mt-2 text-6xl font-black tracking-tight text-amber-400">
+              <p className="text-xs uppercase tracking-wider text-slate-500">Your Position in Line</p>
+              <div className="mt-2 text-6xl font-black tracking-tight text-[#F97316]">
                 #{statusData.queue_position}
               </div>
-              <p className="mt-2 text-sm text-gray-300">
+              <p className="mt-2 text-sm text-slate-600">
                 Estimated Wait:{" "}
-                <span className="font-semibold text-white">~{statusData.estimated_wait_minutes} Minutes</span>
+                <span className="font-bold text-[#1E293B]">~{statusData.estimated_wait_minutes} Minutes</span>
               </p>
             </div>
 
-            <p className="text-center text-xs text-gray-400">
+            <p className="text-center text-xs text-slate-500">
               All tables matching {statusData.guest_count || guestCount} guests are currently occupied. We will assign the next table automatically.
             </p>
 
@@ -425,7 +428,7 @@ export default function JoinPage() {
                 type="button"
                 onClick={handleRefresh}
                 disabled={submitting}
-                className="w-full rounded-xl bg-amber-500 py-3 text-sm font-semibold text-gray-950 hover:bg-amber-400 transition disabled:opacity-50"
+                className="w-full rounded-xl bg-[#F97316] py-3 text-sm font-semibold text-white hover:bg-[#EA580C] transition disabled:opacity-50 shadow-md"
               >
                 Refresh Queue Position
               </button>
@@ -433,7 +436,7 @@ export default function JoinPage() {
                 type="button"
                 onClick={handleCancel}
                 disabled={submitting}
-                className="w-full rounded-xl border border-red-500/20 bg-red-500/10 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/20 transition disabled:opacity-50"
+                className="w-full rounded-xl border border-red-200 bg-red-50 py-3 text-sm font-semibold text-red-600 hover:bg-red-100 transition disabled:opacity-50"
               >
                 Leave Queue
               </button>
@@ -441,24 +444,24 @@ export default function JoinPage() {
           </div>
         ) : (
           /* 3. INPUT FORM STATE */
-          <form onSubmit={handleFindTable} className="space-y-5 rounded-2xl border border-gray-800 bg-gray-900/90 p-6 shadow-xl backdrop-blur">
+          <form onSubmit={handleFindTable} className="space-y-5 rounded-2xl border border-orange-200 bg-white p-6 shadow-xl">
             <div>
-              <label className="block text-xs font-medium text-gray-300">
-                Number of Guests <span className="text-red-400">*</span>
+              <label className="block text-xs font-semibold text-[#1E293B]">
+                Number of Guests <span className="text-red-500">*</span>
               </label>
-              <div className="mt-2 flex items-center justify-between rounded-xl bg-gray-950 p-2 ring-1 ring-white/10">
+              <div className="mt-2 flex items-center justify-between rounded-xl bg-[#FFF7ED] p-2 border border-orange-200">
                 <button
                   type="button"
                   onClick={() => setGuestCount((prev) => Math.max(1, prev - 1))}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-800 text-lg font-bold text-gray-300 hover:bg-gray-700 transition"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-orange-200 text-lg font-bold text-[#1E293B] hover:bg-orange-100 transition"
                 >
                   -
                 </button>
-                <span className="text-xl font-bold text-white">{guestCount} Guests</span>
+                <span className="text-xl font-bold text-[#1E293B]">{guestCount} Guests</span>
                 <button
                   type="button"
                   onClick={() => setGuestCount((prev) => Math.min(20, prev + 1))}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-800 text-lg font-bold text-gray-300 hover:bg-gray-700 transition"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-orange-200 text-lg font-bold text-[#1E293B] hover:bg-orange-100 transition"
                 >
                   +
                 </button>
@@ -466,31 +469,31 @@ export default function JoinPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-300">Guest Name (Optional)</label>
+              <label className="block text-xs font-semibold text-[#1E293B]">Guest Name (Optional)</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. John Doe"
-                className="mt-1.5 w-full rounded-xl bg-gray-950 px-4 py-3 text-sm text-white placeholder-gray-500 ring-1 ring-white/10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                className="mt-1.5 w-full rounded-xl bg-[#FFF7ED] px-4 py-3 text-sm text-[#1E293B] placeholder-slate-400 border border-orange-200 focus:border-[#F97316] focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-300">Email Address (Optional)</label>
+              <label className="block text-xs font-semibold text-[#1E293B]">Email Address (Optional)</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="e.g. john@example.com"
-                className="mt-1.5 w-full rounded-xl bg-gray-950 px-4 py-3 text-sm text-white placeholder-gray-500 ring-1 ring-white/10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                className="mt-1.5 w-full rounded-xl bg-[#FFF7ED] px-4 py-3 text-sm text-[#1E293B] placeholder-slate-400 border border-orange-200 focus:border-[#F97316] focus:outline-none"
               />
             </div>
 
             <button
               type="submit"
               disabled={submitting || Boolean(isCooldown)}
-              className="mt-4 w-full rounded-xl bg-amber-500 py-3.5 text-sm font-semibold text-gray-950 hover:bg-amber-400 transition disabled:opacity-50"
+              className="mt-4 w-full rounded-xl bg-[#F97316] py-3.5 text-sm font-bold text-white hover:bg-[#EA580C] transition disabled:opacity-50 shadow-lg shadow-orange-500/20"
             >
               {submitting ? "Allocating Table..." : "Find Table"}
             </button>

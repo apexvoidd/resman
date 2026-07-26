@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import json
 import urllib.request
 import urllib.error
+import httpx
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -22,7 +23,7 @@ from app.models.audit import AuditLog
 from app.models.billing import Bill, BillItem, Invoice, Payment
 from app.models.customer import GuestSession
 from app.models.notification import Notification
-from app.models.order import Order
+from app.models.order import Order, OrderItem
 from app.models.restaurant import Restaurant
 from app.models.settings import RestaurantSettings
 from app.models.staff import User
@@ -88,6 +89,28 @@ async def request_bill(db: AsyncSession, session_token: str) -> dict[str, str]:
             detail="Active dining session not found.",
         )
 
+    # Check all orders in session are completed or ready — block if any are still being prepared
+    orders_res = await db.execute(
+        select(Order).where(
+            Order.guest_session_id == session.id,
+            Order.deleted_at.is_(None),
+        )
+    )
+    all_orders = orders_res.scalars().all()
+    active_orders = [o for o in all_orders if o.status not in ("completed", "ready", "served", "cancelled")]
+    if active_orders:
+        pending_statuses = ", ".join(set(o.status for o in active_orders))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot request bill yet — some orders are still being processed ({pending_statuses}). Please wait for the kitchen to complete all orders.",
+        )
+
+    if not all_orders or all(o.status == "cancelled" for o in all_orders):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active orders found for this session.",
+        )
+
     session.bill_requested_at = now
 
     table_num = session.table.table_number if session.table else "N/A"
@@ -110,16 +133,16 @@ async def generate_bill(
     db: AsyncSession, payload: BillGenerateInput, current_user: User
 ) -> BillOut:
     """
-    Waiter reviews order and generates itemized bill.
+    Waiter generates a consolidated bill for ALL orders in a dining session.
     LOCKS the dining session to prevent new orders.
     """
     now = datetime.now(timezone.utc)
 
-    # 1. Fetch Order with items, table, and guest session
+    # 1. Fetch the anchor order to get session context
     order_res = await db.execute(
         select(Order)
         .options(
-            selectinload(Order.items),
+            selectinload(Order.items).selectinload(OrderItem.menu_item),
             selectinload(Order.table),
             selectinload(Order.guest_session),
         )
@@ -132,17 +155,57 @@ async def generate_bill(
             detail="Order not found.",
         )
 
-    # 2. Check if a bill already exists for this order
+    # 2. Fetch ALL non-cancelled orders from the same session or table
+    if order.guest_session_id:
+        all_orders_res = await db.execute(
+            select(Order)
+            .options(selectinload(Order.items).selectinload(OrderItem.menu_item))
+            .where(
+                Order.guest_session_id == order.guest_session_id,
+                Order.deleted_at.is_(None),
+                Order.status.notin_(["cancelled"]),
+            )
+        )
+        session_orders = all_orders_res.scalars().all()
+    elif order.table_id:
+        all_orders_res = await db.execute(
+            select(Order)
+            .options(selectinload(Order.items).selectinload(OrderItem.menu_item))
+            .where(
+                Order.table_id == order.table_id,
+                Order.deleted_at.is_(None),
+                Order.status.notin_(["cancelled"]),
+            )
+        )
+        session_orders = all_orders_res.scalars().all()
+    else:
+        session_orders = [order]
+
+    # 3. Block if any order is still being prepared
+    incomplete_statuses = {"pending", "accepted", "preparing", "paused"}
+    incomplete = [o for o in session_orders if o.status in incomplete_statuses]
+    if incomplete:
+        statuses = ", ".join(set(o.status for o in incomplete))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot generate bill — {len(incomplete)} order(s) still in progress ({statuses}). Wait for kitchen to complete all orders.",
+        )
+
+    # 4. Check if a consolidated bill already exists for this session
+    session_order_ids = [o.id for o in session_orders]
     existing_bill_res = await db.execute(
         select(Bill)
         .options(selectinload(Bill.items))
-        .where(Bill.order_id == order.id, Bill.deleted_at.is_(None))
+        .where(Bill.order_id.in_(session_order_ids), Bill.deleted_at.is_(None))
+        .order_by(Bill.created_at.desc())
+        .limit(1)
     )
     existing_bill = existing_bill_res.scalar_one_or_none()
 
-    # 3. Calculate calculations
+    # 5. Calculate totals across ALL session orders
     settings_obj = await _get_restaurant_settings(db)
-    subtotal = sum(float(item.total_price) for item in order.items)
+    all_items = [item for o in session_orders for item in o.items]
+    subtotal = sum(float(item.total_price) for item in all_items)
     tax_pct = float(settings_obj.tax_percentage or 0.0)
     service_pct = float(settings_obj.service_charge_percentage or 0.0)
 
@@ -155,7 +218,7 @@ async def generate_bill(
     grand_total = max(0.0, grand_total)
 
     if existing_bill:
-        # Update existing bill
+        # Update existing consolidated bill
         existing_bill.subtotal = subtotal
         existing_bill.tax_amount = tax_amount + service_charge_amount
         existing_bill.discount_amount = discount
@@ -163,10 +226,10 @@ async def generate_bill(
         existing_bill.total_amount = grand_total
         bill = existing_bill
     else:
-        # Generate new bill number
+        # Generate new consolidated bill using anchor order id
         bill_num = f"INV-{now.strftime('%Y')}-{uuid.uuid4().hex[:6].upper()}"
         bill = Bill(
-            order_id=order.id,
+            order_id=order.id,  # anchor order
             bill_number=bill_num,
             subtotal=subtotal,
             tax_amount=tax_amount + service_charge_amount,
@@ -178,24 +241,24 @@ async def generate_bill(
         db.add(bill)
         await db.flush()
 
-        # Add bill itemized snapshots
-        for item in order.items:
+        # Add itemized snapshots for ALL session orders
+        for item in all_items:
             db.add(
                 BillItem(
                     bill_id=bill.id,
                     order_item_id=item.id,
-                    item_name=item.notes or "Dish Item",
+                    item_name=item.menu_item.name if item.menu_item else "Dish Item",
                     quantity=item.quantity,
                     unit_price=float(item.unit_price),
                     total_price=float(item.total_price),
                 )
             )
 
-    # 4. LOCK THE DINING SESSION
+    # 6. LOCK THE DINING SESSION
     if order.guest_session:
         order.guest_session.is_locked = True
 
-    # 5. Audit Log
+    # 7. Audit Log
     db.add(
         AuditLog(
             user_id=current_user.id,
@@ -205,6 +268,7 @@ async def generate_bill(
             new_value={
                 "bill_number": bill.bill_number,
                 "grand_total": grand_total,
+                "order_count": len(session_orders),
                 "is_locked": True,
             },
         )
@@ -220,6 +284,7 @@ def _build_bill_out(bill: Bill, order: Order | None, settings_obj: RestaurantSet
     table_num = order.table.table_number if order and order.table else None
     guest_name = order.guest_session.guest_name if order and order.guest_session else None
     guest_email = order.guest_session.guest_email if order and order.guest_session else None
+    session_id = order.guest_session.id if order and order.guest_session else None
     is_locked = order.guest_session.is_locked if order and order.guest_session else True
     can_review = order.guest_session.can_submit_review if order and order.guest_session else False
 
@@ -244,6 +309,7 @@ def _build_bill_out(bill: Bill, order: Order | None, settings_obj: RestaurantSet
     return BillOut(
         id=bill.id,
         order_id=bill.order_id,
+        session_id=session_id,
         bill_number=bill.bill_number,
         table_number=table_num,
         guest_name=guest_name,
@@ -340,6 +406,40 @@ async def get_waiter_notifications(db: AsyncSession) -> list[dict]:
         }
         for n in notifs
     ]
+
+
+async def mark_notification_read(
+    db: AsyncSession, notification_id: uuid.UUID
+) -> dict[str, str]:
+    """Mark a single waiter notification as read (dismiss)."""
+    now = datetime.now(timezone.utc)
+    res = await db.execute(
+        select(Notification).where(Notification.id == notification_id)
+    )
+    notif = res.scalar_one_or_none()
+    if not notif:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found.")
+    notif.status = "read"
+    notif.read_at = now
+    await db.commit()
+    return {"message": "Notification marked as read."}
+
+
+async def clear_all_waiter_notifications(db: AsyncSession) -> dict[str, str]:
+    """Mark all unread waiter notifications as read (clear all)."""
+    now = datetime.now(timezone.utc)
+    res = await db.execute(
+        select(Notification).where(
+            Notification.recipient_type == "waiter",
+            Notification.status == "unread",
+        )
+    )
+    notifs = res.scalars().all()
+    for n in notifs:
+        n.status = "read"
+        n.read_at = now
+    await db.commit()
+    return {"message": f"Cleared {len(notifs)} notification(s)."}
 
 
 async def unlock_session(
@@ -447,32 +547,57 @@ async def create_razorpay_order(
     # Call Razorpay API if live credentials present
     if settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET:
         try:
-            import base64
-            auth_str = base64.b64encode(f"{key_id}:{key_secret}".encode()).decode()
-            data = json.dumps({
-                "amount": amount_paise,
-                "currency": "INR",
-                "receipt": bill.bill_number,
-                "notes": {"bill_id": str(bill.id)},
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                "https://api.razorpay.com/v1/orders",
-                data=data,
-                headers={
-                    "Authorization": f"Basic {auth_str}",
-                    "Content-Type": "application/json",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                rzp_data = json.loads(resp.read().decode("utf-8"))
-                rzp_order_id = rzp_data.get("id", f"order_{uuid.uuid4().hex[:14]}")
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    "https://api.razorpay.com/v1/orders",
+                    json={
+                        "amount": amount_paise,
+                        "currency": "INR",
+                        "receipt": bill.bill_number[:40],
+                        "notes": {"bill_id": str(bill.id)},
+                    },
+                    auth=(key_id, key_secret),
+                )
+            if resp.status_code != 200:
+                error_body = resp.text
+                logger.error("Razorpay API error %s: %s", resp.status_code, error_body)
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Razorpay order creation failed: {error_body}",
+                )
+            rzp_data = resp.json()
+            rzp_order_id = rzp_data["id"]
+        except HTTPException:
+            raise
         except Exception as exc:
-            logger.warning("Razorpay API connection notice: %s", exc)
-            rzp_order_id = f"order_dev_{uuid.uuid4().hex[:14]}"
+            logger.error("Razorpay API unreachable: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Could not connect to Razorpay. Please try again.",
+            )
     else:
-        # Dev mode mock Razorpay Order ID
+        # Dev mode mock Razorpay Order ID (no real keys set)
         rzp_order_id = f"order_dev_{uuid.uuid4().hex[:14]}"
+
+    # Check for existing pending payment to avoid duplicate Razorpay orders
+    existing_pending = await db.execute(
+        select(Payment).where(
+            Payment.bill_id == bill.id,
+            Payment.status == "pending",
+            Payment.payment_gateway == "razorpay",
+        )
+    )
+    existing_pay = existing_pending.scalar_one_or_none()
+    if existing_pay:
+        # Reuse existing pending payment order instead of creating a duplicate
+        return RazorpayOrderCreateOut(
+            razorpay_order_id=existing_pay.razorpay_order_id,
+            amount=float(existing_pay.amount),
+            amount_paise=int(round(float(existing_pay.amount) * 100)),
+            currency="INR",
+            key_id=key_id,
+            bill_id=bill.id,
+        )
 
     # Save pending Payment record
     db.add(
@@ -707,12 +832,39 @@ async def _execute_post_payment_actions(
         if bill.order.table:
             bill.order.table.status = "cleaning"
 
+        # Mark ALL orders of this session as completed
+        if bill.order.guest_session_id:
+            sess_orders_res = await db.execute(
+                select(Order).where(
+                    Order.guest_session_id == bill.order.guest_session_id,
+                    Order.deleted_at.is_(None),
+                )
+            )
+            for ord_obj in sess_orders_res.scalars().all():
+                if ord_obj.status != "cancelled":
+                    ord_obj.status = "completed"
+        elif bill.order.table_id:
+            tbl_orders_res = await db.execute(
+                select(Order).where(
+                    Order.table_id == bill.order.table_id,
+                    Order.deleted_at.is_(None),
+                )
+            )
+            for ord_obj in tbl_orders_res.scalars().all():
+                if ord_obj.status != "cancelled":
+                    ord_obj.status = "completed"
+        else:
+            if bill.order.status != "cancelled":
+                bill.order.status = "completed"
+
         # Dining session -> ended, unlock & enable review
         if bill.order.guest_session:
             sess = bill.order.guest_session
             sess.is_active = False
             sess.is_locked = False
             sess.can_submit_review = True
+            sess.table_id = None
+            sess.reservation_expires_at = None
 
             # Trigger Resend Email if email is present
             if sess.guest_email:
@@ -833,3 +985,27 @@ def generate_invoice_html(bill: BillOut) -> str:
     </body>
     </html>
     """
+
+
+async def get_all_bills(
+    db: AsyncSession, status_filter: str | None = None
+) -> list[BillOut]:
+    """Fetch all bills with optional status filtering for Cashier POS."""
+    stmt = (
+        select(Bill)
+        .options(
+            selectinload(Bill.items),
+            selectinload(Bill.payments),
+            selectinload(Bill.order).selectinload(Order.table),
+            selectinload(Bill.order).selectinload(Order.guest_session),
+        )
+        .order_by(Bill.created_at.desc())
+    )
+    if status_filter:
+        stmt = stmt.where(Bill.status == status_filter)
+
+    settings_obj = await _get_restaurant_settings(db)
+    res = await db.execute(stmt)
+    bills = res.scalars().all()
+    return [_build_bill_out(b, b.order, settings_obj) for b in bills]
+

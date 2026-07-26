@@ -6,10 +6,14 @@ import { NextResponse } from "next/server";
  * All other routes are protected by default.
  */
 const isPublicRoute = createRouteMatcher([
+  "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/unauthorized",
   "/join(.*)",
+  "/menu/public(.*)",
+  "/billing(.*)",
+  "/reviews(.*)",
   "/api/health",
 ]);
 

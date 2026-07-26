@@ -29,7 +29,7 @@ from app.models.recipe import (
     WasteRecord,
 )
 from app.models.restaurant import Branch, Restaurant
-from app.models.review import Review, ReviewImage, ReviewReaction
+from app.models.review import Review
 from app.models.settings import RestaurantSettings
 from app.models.staff import Permission, Role, RolePermission, User, UserRole
 from app.models.table import DiningTable, QueueEntry
@@ -73,8 +73,6 @@ __all__ = [
     "Coupon",
     "Discount",
     "Review",
-    "ReviewImage",
-    "ReviewReaction",
     "RewardPoint",
     "RewardTransaction",
     "CustomerCoupon",

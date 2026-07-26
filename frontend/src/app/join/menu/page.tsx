@@ -244,13 +244,27 @@ export default function CustomerSeatedMenuPage() {
                 💳 Pay Bill (₹{activeBill.grand_total.toFixed(2)})
               </Link>
             ) : (
-              <button
-                type="button"
-                onClick={handleRequestBill}
-                className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-bold text-amber-300 hover:bg-amber-500/20 transition"
-              >
-                🧾 Request Bill
-              </button>
+              (() => {
+                const hasIncomplete = sessionOrders.some(
+                  (o) => !["completed", "ready", "served", "cancelled"].includes(o.status)
+                );
+                const hasOrders = sessionOrders.some((o) => o.status !== "cancelled");
+                return (
+                  <button
+                    type="button"
+                    onClick={handleRequestBill}
+                    disabled={hasIncomplete || !hasOrders}
+                    title={hasIncomplete ? "Wait for kitchen to complete all orders" : !hasOrders ? "No orders placed yet" : "Request final bill"}
+                    className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-bold transition ${
+                      hasIncomplete || !hasOrders
+                        ? "border-gray-700 bg-gray-800 text-gray-500 cursor-not-allowed opacity-50"
+                        : "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                    }`}
+                  >
+                    🧾 {hasIncomplete ? "Orders in progress..." : "Request Bill"}
+                  </button>
+                );
+              })()
             )}
             <button
               type="button"
@@ -661,13 +675,27 @@ export default function CustomerSeatedMenuPage() {
                   💳 Pay Bill (₹{activeBill.grand_total.toFixed(2)})
                 </Link>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleRequestBill}
-                  className="px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs rounded-xl transition flex items-center gap-2"
-                >
-                  🧾 Request Final Bill
-                </button>
+                (() => {
+                  const hasIncomplete = sessionOrders.some(
+                    (o) => !["completed", "ready", "served", "cancelled"].includes(o.status)
+                  );
+                  const hasOrders = sessionOrders.some((o) => o.status !== "cancelled");
+                  return (
+                    <button
+                      type="button"
+                      onClick={handleRequestBill}
+                      disabled={hasIncomplete || !hasOrders}
+                      title={hasIncomplete ? "Wait for all orders to complete" : "Request final bill"}
+                      className={`px-4 py-2.5 font-bold text-xs rounded-xl transition flex items-center gap-2 border ${
+                        hasIncomplete || !hasOrders
+                          ? "bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed opacity-50"
+                          : "bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40"
+                      }`}
+                    >
+                      🧾 {hasIncomplete ? "Kitchen busy..." : "Request Final Bill"}
+                    </button>
+                  );
+                })()
               )}
             </div>
           </div>

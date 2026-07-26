@@ -69,6 +69,21 @@ async def generate_bill(
 
 
 @router.get(
+    "/bills",
+    response_model=list[BillOut],
+    summary="List all bills for Cashier POS Terminal",
+    status_code=status.HTTP_200_OK,
+)
+async def list_all_bills(
+    status_filter: str | None = None,
+    current_user: User = Depends(require_role(["cashier", "waiter", "manager", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Cashier/Manager lists all bills with optional status filter."""
+    return await billing_service.get_all_bills(db, status_filter)
+
+
+@router.get(
     "/bills/{bill_id}",
     response_model=BillOut,
     summary="Fetch itemized bill details by ID",
@@ -109,6 +124,33 @@ async def get_waiter_notifications(
 ) -> Any:
     """Waiter fetches unread real-time notifications and bill requests."""
     return await billing_service.get_waiter_notifications(db)
+
+
+@router.post(
+    "/notifications/waiter/clear-all",
+    summary="Clear all unread waiter notifications",
+    status_code=status.HTTP_200_OK,
+)
+async def clear_waiter_notifications(
+    current_user: User = Depends(require_role(["waiter", "cashier", "manager", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Mark all unread waiter notifications as read."""
+    return await billing_service.clear_all_waiter_notifications(db)
+
+
+@router.post(
+    "/notifications/{notification_id}/read",
+    summary="Dismiss a single waiter notification",
+    status_code=status.HTTP_200_OK,
+)
+async def dismiss_notification(
+    notification_id: uuid.UUID,
+    current_user: User = Depends(require_role(["waiter", "cashier", "manager", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Mark a single notification as read (dismiss it)."""
+    return await billing_service.mark_notification_read(db, notification_id)
 
 
 @router.post(

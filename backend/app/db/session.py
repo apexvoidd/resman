@@ -42,6 +42,38 @@ async def init_db() -> None:
                         sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN bill_requested_at DATETIME;"))
                     if "can_submit_review" not in cols:
                         sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN can_submit_review BOOLEAN DEFAULT 0 NOT NULL;"))
+                    if "expires_at" not in cols:
+                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN expires_at DATETIME NOT NULL DEFAULT (datetime('now', '+2 hours'));"))
+                    if "occupied_at" not in cols:
+                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN occupied_at DATETIME;"))
+                    if "verification_requested_at" not in cols:
+                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN verification_requested_at DATETIME;"))
+                    if "rejection_reason" not in cols:
+                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN rejection_reason VARCHAR(500);"))
+                    if "cooldown_until" not in cols:
+                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN cooldown_until DATETIME;"))
+                    if "guest_email" not in cols:
+                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN guest_email VARCHAR(255);"))
+                    if "guest_count" not in cols:
+                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN guest_count INTEGER;"))
+                    if "reservation_expires_at" not in cols:
+                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN reservation_expires_at DATETIME;"))
+
+                # Ensure reviews columns
+                if "reviews" in inspector.get_table_names():
+                    cols = {c["name"] for c in inspector.get_columns("reviews")}
+                    if "guest_session_id" not in cols:
+                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN guest_session_id CHAR(36);"))
+                    if "menu_item_id" not in cols:
+                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN menu_item_id CHAR(36);"))
+                    if "display_name" not in cols:
+                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN display_name VARCHAR(100);"))
+                    if "manager_reply" not in cols:
+                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN manager_reply TEXT;"))
+                    if "is_hidden" not in cols:
+                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN is_hidden BOOLEAN DEFAULT 0 NOT NULL;"))
+                    if "is_verified" not in cols:
+                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN is_verified BOOLEAN DEFAULT 1 NOT NULL;"))
 
                 # Ensure payments columns
                 if "payments" in inspector.get_table_names():

@@ -50,8 +50,6 @@ async def _get_default_branch(db: AsyncSession) -> Branch:
         if not restaurant:
             restaurant = Restaurant(
                 name="Smart Restaurant",
-                slug="smart-restaurant",
-                description="Modern Restaurant & Dining Experience",
                 is_active=True,
             )
             db.add(restaurant)
@@ -95,13 +93,21 @@ async def get_or_create_guest_session(
         result = await db.execute(
             select(GuestSession).where(
                 GuestSession.session_token == session_token,
-                GuestSession.is_active == True,  # noqa: E712
-                GuestSession.expires_at > now,
             )
         )
         existing = result.scalar_one_or_none()
         if existing:
-            return existing
+            # Normalize expires_at to UTC-aware for comparison (SQLite returns naive datetimes)
+            exp = existing.expires_at
+            if exp is not None and exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            # Session is active — return as-is or extend if expired with table
+            if existing.is_active:
+                if exp is not None and exp <= now and existing.table_id is not None:
+                    existing.expires_at = now + timedelta(hours=SESSION_DURATION_HOURS)
+                    await db.commit()
+                    await db.refresh(existing)
+                return existing
 
     branch = await _get_default_branch(db)
     token = f"gs_{secrets.token_urlsafe(32)}"
@@ -146,6 +152,50 @@ async def release_expired_reservations(db: AsyncSession, branch_id: UUID) -> Non
             sess.verification_status = "none"
 
     await db.commit()
+
+
+async def _find_best_table(
+    db: AsyncSession, branch_id: UUID, guest_count: int
+) -> "DiningTable | None":
+    """
+    Smart table selection logic:
+    1. Try exact or smallest-sufficient table first (capacity >= guest_count).
+    2. If none available AND guest_count > max available table capacity,
+       assign the LARGEST available table (better than leaving them stuck in queue).
+    3. If no available tables at all, return None.
+    """
+    # First: try to find a table that fits
+    stmt = (
+        select(DiningTable)
+        .where(
+            DiningTable.branch_id == branch_id,
+            DiningTable.is_active == True,  # noqa: E712
+            DiningTable.deleted_at.is_(None),
+            DiningTable.status == "available",
+            DiningTable.capacity >= guest_count,
+        )
+        .order_by(DiningTable.capacity.asc())  # smallest fitting table first
+    )
+    result = await db.execute(stmt)
+    table = result.scalars().first()
+    if table:
+        return table
+
+    # Second: no table fits — find the largest available table as fallback
+    # (e.g. 6-person group but only 4-person tables available)
+    stmt_largest = (
+        select(DiningTable)
+        .where(
+            DiningTable.branch_id == branch_id,
+            DiningTable.is_active == True,  # noqa: E712
+            DiningTable.deleted_at.is_(None),
+            DiningTable.status == "available",
+        )
+        .order_by(DiningTable.capacity.desc())  # largest available table
+    )
+    result_largest = await db.execute(stmt_largest)
+    largest = result_largest.scalars().first()
+    return largest  # None if no tables at all
 
 
 async def find_table_or_enqueue(
@@ -199,25 +249,9 @@ async def find_table_or_enqueue(
     session.guest_email = payload.email
     session.guest_count = payload.guest_count
 
-    stmt = (
-        select(DiningTable)
-        .where(
-            DiningTable.branch_id == branch_id,
-            DiningTable.is_active == True,  # noqa: E712
-            DiningTable.deleted_at.is_(None),
-            DiningTable.status == "available",
-            DiningTable.capacity >= payload.guest_count,
-        )
-        .order_by(DiningTable.capacity.asc())
-    )
-    if not settings.DATABASE_URL.startswith("sqlite"):
-        stmt = stmt.with_for_update()
+    best_table = await _find_best_table(db, branch_id, payload.guest_count)
 
-    candidate_res = await db.execute(stmt)
-    candidate_tables = candidate_res.scalars().all()
-
-    if candidate_tables:
-        best_table = candidate_tables[0]
+    if best_table:
         reservation_expiry = now + timedelta(minutes=RESERVATION_DURATION_MINUTES)
 
         best_table.status = "reserved"
@@ -250,7 +284,10 @@ async def find_table_or_enqueue(
             verification_status=session.verification_status,
             rejection_reason=session.rejection_reason,
             menu_unlocked=False,
-            message=f"Table {best_table.table_number} reserved successfully for {RESERVATION_DURATION_MINUTES} minutes!",
+            message=(
+                f"Table {best_table.table_number} reserved for {RESERVATION_DURATION_MINUTES} minutes!"
+                + (f" Note: table seats {best_table.capacity} — please arrange extra seating with staff." if best_table.capacity < payload.guest_count else "")
+            ),
         )
 
     q_existing = await db.execute(
@@ -554,6 +591,62 @@ async def get_guest_session_status(
     q_entry = q_res.scalar_one_or_none()
     if q_entry:
         branch_id = session.branch_id or (await _get_default_branch(db)).id
+
+        # AUTO-ASSIGN: check if a table is now available for this queued customer
+        guest_count = session.guest_count or q_entry.guest_count or 1
+        available_table = await _find_best_table(db, branch_id, guest_count)
+
+        if available_table:
+            # Table is available — assign it and remove from queue
+            reservation_expiry = now + timedelta(minutes=RESERVATION_DURATION_MINUTES)
+            available_table.status = "reserved"
+            session.table_id = available_table.id
+            session.reservation_expires_at = reservation_expiry
+            session.verification_status = "none"
+            q_entry.status = "seated"
+
+            # Notify customer (waiter notification)
+            db.add(
+                Notification(
+                    recipient_type="waiter",
+                    title=f"Queue Customer Seated: Table {available_table.table_number}",
+                    message=f"Guest '{session.guest_name or 'Walk-in'}' from the waiting queue has been assigned Table {available_table.table_number}.",
+                    notification_type="queue_seated",
+                    status="unread",
+                    payload_json={
+                        "table_id": str(available_table.id),
+                        "table_number": available_table.table_number,
+                        "guest_session_id": str(session.id),
+                    },
+                )
+            )
+            await db.commit()
+            await db.refresh(session)
+
+            remaining_sec = int((reservation_expiry - now).total_seconds())
+            return GuestStatusOut(
+                session_token=session.session_token,
+                guest_name=session.guest_name,
+                guest_count=session.guest_count,
+                has_active_reservation=True,
+                table_id=available_table.id,
+                table_number=available_table.table_number,
+                capacity=available_table.capacity,
+                table_status="reserved",
+                reservation_expires_at=reservation_expiry,
+                remaining_seconds=remaining_sec,
+                verification_status="none",
+                menu_unlocked=False,
+                in_queue=False,
+                cooldown_active=cooldown_active,
+                cooldown_remaining_seconds=cooldown_rem_sec,
+                message=(
+                    f"🎉 Table {available_table.table_number} reserved for you!"
+                    + (f" Note: table seats {available_table.capacity} — please arrange extra seating with staff." if available_table.capacity < guest_count else "")
+                ),
+            )
+
+        # No table yet — return queue position
         pos_res = await db.execute(
             select(func.count(QueueEntry.id)).where(
                 QueueEntry.branch_id == branch_id,

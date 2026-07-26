@@ -23,6 +23,7 @@ class BillItemOut(BaseModel):
 class BillOut(BaseModel):
     id: uuid.UUID
     order_id: uuid.UUID
+    session_id: uuid.UUID | None = None
     bill_number: str
     table_number: str | None = None
     guest_name: str | None = None

@@ -26,6 +26,9 @@ from app.schemas.table import (
     TableUpdate,
 )
 
+import logging
+logger = logging.getLogger("app.services.table")
+
 
 def _build_table_out(table: DiningTable) -> TableOut:
     """Map DiningTable ORM model to TableOut DTO."""
@@ -302,6 +305,13 @@ async def get_pending_verifications(db: AsyncSession) -> list[PendingVerificatio
     now = datetime.now(timezone.utc)
     branch = await get_or_create_default_branch(db)
 
+    # Release any expired reservations so tables don't stay stuck
+    from app.services.guest import release_expired_reservations
+    try:
+        await release_expired_reservations(db, branch.id)
+    except Exception:
+        pass
+
     result = await db.execute(
         select(DiningTable, GuestSession)
         .join(GuestSession, GuestSession.table_id == DiningTable.id)
@@ -475,3 +485,56 @@ async def check_no_order_reminders(db: AsyncSession) -> None:
                 )
             )
     await db.commit()
+
+
+async def get_cleaning_queue(db: AsyncSession) -> list[TableOut]:
+    """Fetch all tables currently in 'cleaning' status."""
+    branch = await get_or_create_default_branch(db)
+    result = await db.execute(
+        select(DiningTable).where(
+            DiningTable.branch_id == branch.id,
+            DiningTable.status == "cleaning",
+            DiningTable.deleted_at.is_(None),
+        ).order_by(DiningTable.table_number.asc())
+    )
+    tables = result.scalars().all()
+    return [_build_table_out(t) for t in tables]
+
+
+async def mark_table_clean(
+    db: AsyncSession, table_id: uuid.UUID, current_user: User
+) -> TableOut:
+    """Cleaning staff marks table as clean — sets status back to available."""
+    result = await db.execute(
+        select(DiningTable).where(
+            DiningTable.id == table_id,
+            DiningTable.deleted_at.is_(None),
+        )
+    )
+    table = result.scalar_one_or_none()
+    if not table:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Table '{table_id}' not found.",
+        )
+    if table.status != "cleaning":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Table {table.table_number} is '{table.status}', not in cleaning status.",
+        )
+
+    table.status = "available"
+
+    db.add(
+        AuditLog(
+            user_id=current_user.id,
+            action="TABLE_MARKED_CLEAN",
+            entity="DiningTable",
+            entity_id=table.id,
+            old_value={"status": "cleaning"},
+            new_value={"status": "available"},
+        )
+    )
+    await db.commit()
+    await db.refresh(table)
+    return _build_table_out(table)

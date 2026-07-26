@@ -46,6 +46,15 @@ async def get_session_orders(
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Fetch active and past orders from the current dining session."""
+    if x_session_token:
+        from sqlalchemy import select
+        from app.models.customer import GuestSession
+        res = await db.execute(
+            select(GuestSession).where(GuestSession.session_token == x_session_token)
+        )
+        session = res.scalar_one_or_none()
+        if session:
+            return await order_service.get_session_orders(db, session)
     session = await get_or_create_guest_session(db, session_token=x_session_token)
     return await order_service.get_session_orders(db, session)
 

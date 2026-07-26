@@ -14,11 +14,11 @@ from app.models.staff import User
 from app.schemas.recipe import RecipeCreatePayload, RecipeOut
 from app.services import recipe as recipe_service
 
-router = APIRouter(prefix="/recipes", tags=["Recipe Management"])
+router = APIRouter(tags=["Recipe Management"])
 
 
 @router.get(
-    "",
+    "/",
     response_model=list[RecipeOut],
     summary="List all recipes with ingredient requirements",
     status_code=status.HTTP_200_OK,
@@ -47,7 +47,7 @@ async def get_recipe_by_menu_item_id(
 
 
 @router.post(
-    "",
+    "/",
     response_model=RecipeOut,
     summary="Create or update menu item recipe (Manager/Admin)",
     status_code=status.HTTP_200_OK,

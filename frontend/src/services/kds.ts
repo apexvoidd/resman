@@ -167,3 +167,12 @@ export async function resumeOrder(
   }
   return res.json();
 }
+
+export async function fetchWaiterOrders(token: string): Promise<OrderOut[]> {
+  const res = await kdsFetch("/waiter-orders", token);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? "Failed to fetch waiter orders.");
+  }
+  return res.json();
+}

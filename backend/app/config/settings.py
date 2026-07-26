@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # Security
     SECRET_KEY: str = "default-insecure-secret-key-change-in-production"
-    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "0.0.0.0", "test", "*"]
+    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "0.0.0.0", "test", "testserver", "*"]
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # Database
@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     R2_SECRET_ACCESS_KEY: str = ""
     R2_BUCKET_NAME: str = ""
     R2_PUBLIC_DOMAIN: str = ""
+
+    # Razorpay Payment Gateway
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+
+    # Email via Resend
+    RESEND_API_KEY: str = ""
 
     # Realtime Placeholder Config (Pusher / Ably)
     PUSHER_APP_ID: str = ""
@@ -60,8 +67,25 @@ class Settings(BaseSettings):
     @field_validator("CORS_ORIGINS", "ALLOWED_HOSTS", mode="before")
     @classmethod
     def assemble_list(cls, v: str | list[str]) -> list[str]:
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",") if i.strip()]
+        if isinstance(v, str):
+            v_trimmed = v.strip()
+            if v_trimmed.startswith("[") and v_trimmed.endswith("]"):
+                import json
+                try:
+                    parsed = json.loads(v_trimmed)
+                    if isinstance(parsed, list):
+                        return [str(i).strip().rstrip("/") for i in parsed if str(i).strip()]
+                except Exception:
+                    pass
+                # Fallback stripping brackets
+                v_trimmed = v_trimmed[1:-1]
+            return [
+                i.strip().strip("'\"").rstrip("/")
+                for i in v_trimmed.split(",")
+                if i.strip().strip("'\"")
+            ]
+        elif isinstance(v, list):
+            return [str(i).strip().rstrip("/") for i in v if str(i).strip()]
         return v
 
 

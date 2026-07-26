@@ -1,5 +1,6 @@
 "use client";
 
+import { RouteGuard } from "@/components/RouteGuard";
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
@@ -16,7 +17,7 @@ import {
 } from "@/services/kds";
 import { OrderOut } from "@/services/order";
 
-export default function KitchenDashboardPage() {
+function KitchenDashboardPage() {
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
 
@@ -294,7 +295,6 @@ export default function KitchenDashboardPage() {
               { label: "Preparing", value: "preparing" },
               { label: "Ready", value: "ready" },
               { label: "Paused", value: "paused" },
-              { label: "Completed", value: "completed" },
             ].map(({ label, value }) => (
               <button
                 key={value}
@@ -627,5 +627,13 @@ export default function KitchenDashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function KitchenDashboardWrapper() {
+  return (
+    <RouteGuard roles={["kitchen", "manager", "admin"]}>
+      <KitchenDashboardPage />
+    </RouteGuard>
   );
 }

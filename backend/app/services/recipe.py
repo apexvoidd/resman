@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config.settings import settings
 from app.models.menu import MenuItem
 from app.models.notification import Notification
 from app.models.order import Order, OrderItem

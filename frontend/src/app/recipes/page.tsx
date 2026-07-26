@@ -1,5 +1,6 @@
 "use client";
 
+import { RouteGuard } from "@/components/RouteGuard";
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
@@ -14,7 +15,7 @@ import {
   saveRecipe,
 } from "@/services/recipe";
 
-export default function RecipesPage() {
+function RecipesPage() {
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
 
@@ -561,5 +562,13 @@ export default function RecipesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function RecipesPageWrapper() {
+  return (
+    <RouteGuard permission="inventory:view">
+      <RecipesPage />
+    </RouteGuard>
   );
 }

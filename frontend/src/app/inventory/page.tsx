@@ -1,5 +1,6 @@
 "use client";
 
+import { RouteGuard } from "@/components/RouteGuard";
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
@@ -25,7 +26,7 @@ import {
   WasteRecordPayload,
 } from "@/services/inventory";
 
-export default function InventoryPage() {
+function InventoryPage() {
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
 
@@ -417,8 +418,8 @@ export default function InventoryPage() {
               <p className="mt-2 text-2xl font-extrabold text-emerald-300">{dashboard.in_stock_count}</p>
             </div>
             <div className="rounded-2xl border border-purple-500/30 bg-purple-500/10 p-4 shadow-lg">
-              <span className="text-xs font-bold text-purple-400">Total Stock Value</span>
-              <p className="mt-2 text-2xl font-extrabold text-purple-300">${dashboard.total_inventory_value.toFixed(2)}</p>
+              <span className="text-xs font-bold text-sky-400">Total Stock Value</span>
+              <p className="mt-2 text-2xl font-extrabold text-sky-300">₹{dashboard.total_inventory_value.toFixed(2)}</p>
             </div>
           </div>
         )}
@@ -569,9 +570,9 @@ export default function InventoryPage() {
                             <td className="px-4 py-3.5 text-gray-400 font-mono">
                               {ing.minimum_stock} {ing.unit_of_measure}
                             </td>
-                            <td className="px-4 py-3.5 font-mono text-gray-300">${ing.unit_cost.toFixed(2)}</td>
-                            <td className="px-4 py-3.5 font-mono text-purple-300 font-bold">
-                              ${totalVal.toFixed(2)}
+                            <td className="px-4 py-3.5 font-mono text-gray-300">₹{ing.unit_cost.toFixed(2)}</td>
+                            <td className="px-4 py-3.5 font-mono font-bold text-purple-300">
+                              ₹{totalVal.toFixed(2)}
                             </td>
                             <td className="px-4 py-3.5 text-gray-400">{ing.supplier || "—"}</td>
                             <td className="px-4 py-3.5">
@@ -627,7 +628,7 @@ export default function InventoryPage() {
                                     setWastingIngredient(ing);
                                     setWasteForm({
                                       quantity: 1,
-                                      reason: "Expired",
+                                      reason: "Spoilage/Expired",
                                       notes: "",
                                     });
                                   }}
@@ -811,7 +812,7 @@ export default function InventoryPage() {
               </div>
 
               <div>
-                <label className="block font-semibold text-gray-300">Cost Per Unit ($)</label>
+                <label className="block font-semibold text-gray-300">Cost Per Unit (₹)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -884,7 +885,7 @@ export default function InventoryPage() {
               </div>
 
               <div>
-                <label className="block font-semibold text-gray-300">Purchase Price / Unit ($) *</label>
+                <label className="block font-semibold text-gray-300">Purchase Price / Unit (₹) *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1045,41 +1046,64 @@ export default function InventoryPage() {
           >
             <h3 className="text-base font-bold text-white">Record Ingredient Waste</h3>
             <p className="text-xs text-gray-400">
-              Recording waste for <strong className="text-red-400">{wastingIngredient.name}</strong> (Unit cost: ${wastingIngredient.unit_cost.toFixed(2)})
+              Recording waste for <strong className="text-red-400">{wastingIngredient.name}</strong> (Unit cost: ₹{wastingIngredient.unit_cost.toFixed(2)})
             </p>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-4">
               <div>
-                <label className="block font-semibold text-gray-300">Wasted Quantity ({wastingIngredient.unit_of_measure}) *</label>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  Wasted Quantity ({wastingIngredient.unit_of_measure}) *
+                </label>
                 <input
                   type="number"
-                  step="0.01"
-                  min={0.01}
+                  step="0.001"
+                  min="0.001"
                   max={wastingIngredient.current_stock}
                   required
                   value={wasteForm.quantity}
                   onChange={(e) => setWasteForm({ ...wasteForm, quantity: parseFloat(e.target.value) || 0 })}
-                  className="mt-1 w-full rounded-xl bg-gray-950 px-3.5 py-2.5 text-white ring-1 ring-white/10 focus:ring-2 focus:ring-red-500 focus:outline-none"
+                  className="w-full rounded-xl border border-gray-800 bg-gray-950 p-2.5 text-xs text-white focus:border-amber-500 focus:outline-none"
                 />
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Available stock: {wastingIngredient.current_stock} {wastingIngredient.unit_of_measure}
+                </p>
               </div>
 
               <div>
-                <label className="block font-semibold text-gray-300">Wastage Reason *</label>
-                <input
-                  type="text"
-                  required
+                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  Reason for Waste *
+                </label>
+                <select
                   value={wasteForm.reason}
                   onChange={(e) => setWasteForm({ ...wasteForm, reason: e.target.value })}
-                  placeholder="e.g. Expired, Spoilage, Overcooked, Storage Failure"
-                  className="mt-1 w-full rounded-xl bg-gray-950 px-3.5 py-2.5 text-white ring-1 ring-white/10 focus:outline-none"
+                  className="w-full rounded-xl border border-gray-800 bg-gray-950 p-2.5 text-xs text-white focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="Spoilage/Expired">Spoilage / Expired</option>
+                  <option value="Spill/Damage">Spill / Damage</option>
+                  <option value="Preparation Mistake">Preparation Mistake</option>
+                  <option value="Quality Control">Quality Control Rejection</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  Additional Notes
+                </label>
+                <input
+                  type="text"
+                  value={wasteForm.notes || ""}
+                  onChange={(e) => setWasteForm({ ...wasteForm, notes: e.target.value })}
+                  placeholder="e.g. Fridge temperature fluctuation"
+                  className="w-full rounded-xl border border-gray-800 bg-gray-950 p-2.5 text-xs text-white focus:border-amber-500 focus:outline-none"
                 />
               </div>
 
-              <div className="rounded-xl bg-gray-950 p-3 border border-gray-800 text-xs">
-                <span className="text-gray-400">Estimated Cost Impact:</span>
-                <p className="text-sm font-bold text-red-400 mt-0.5">
-                  ${(wasteForm.quantity * wastingIngredient.unit_cost).toFixed(2)}
-                </p>
+              <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs flex justify-between items-center text-red-300">
+                <span>Calculated Waste Cost Impact:</span>
+                <strong className="font-extrabold text-sm text-red-400">
+                  ₹{(wasteForm.quantity * wastingIngredient.unit_cost).toFixed(2)}
+                </strong>
               </div>
             </div>
 
@@ -1157,5 +1181,13 @@ export default function InventoryPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function InventoryPageWrapper() {
+  return (
+    <RouteGuard permission="inventory:view">
+      <InventoryPage />
+    </RouteGuard>
   );
 }

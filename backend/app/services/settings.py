@@ -41,8 +41,6 @@ async def get_first_restaurant(db: AsyncSession) -> Restaurant:
         # Auto-create default restaurant and settings
         restaurant = Restaurant(
             name="Smart Restaurant",
-            slug="smart-restaurant",
-            description="Modern Restaurant & Dining Experience",
             is_active=True,
         )
         db.add(restaurant)

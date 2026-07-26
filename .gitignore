@@ -20,12 +20,23 @@ ENV/
 .coverage
 htmlcov/
 
-# Environment files
+# Environment & local secret files
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+*.env
+
+# Databases & local state
+*.sqlite
+*.sqlite3
+*.db
+backend/restaurant_db.sqlite
+
+# Media & Temp Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
 
 # Logs
 *.log

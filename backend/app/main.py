@@ -47,11 +47,11 @@ def create_app() -> FastAPI:
     # Security Headers Middleware
     app.add_middleware(SecurityHeadersMiddleware)
 
-    # CORS Setup
-    setup_cors(app)
-
     # Rate Limiter Setup
     setup_rate_limiter(app)
+
+    # CORS Setup (MUST BE LAST to be the OUTERMOST middleware layer)
+    setup_cors(app)
 
     # Register Global Exception Handlers
     register_error_handlers(app)

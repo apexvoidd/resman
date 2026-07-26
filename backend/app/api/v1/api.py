@@ -7,9 +7,11 @@ from app.api.v1.endpoints import (
     health,
     inventory,
     kds,
+    manager,
     menu,
     order,
     recipe,
+    review,
     root,
     settings,
     staff,
@@ -49,11 +51,18 @@ api_router.include_router(kds.router)
 # Inventory Management Endpoints
 api_router.include_router(inventory.router)
 
-# Recipe Management Endpoints
+# Recipe Management Endpoints (Dual Mount for /recipes and /recipe)
 api_router.include_router(recipe.router)
+api_router.include_router(recipe.router, prefix="/recipe", tags=["Recipe Management (Alias)"])
+
+# Manager Hub & Analytics Endpoints
+api_router.include_router(manager.router)
 
 # Billing & Payments Endpoints
 api_router.include_router(billing.router, prefix="/billing", tags=["Billing & Payments"])
+
+# Customer Reviews Endpoints
+api_router.include_router(review.router)
 
 
 

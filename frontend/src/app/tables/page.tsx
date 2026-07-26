@@ -1,5 +1,6 @@
 "use client";
 
+import { RouteGuard } from "@/components/RouteGuard";
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -78,7 +79,7 @@ const STATUS_CONFIG: Record<
   },
 };
 
-export default function TableListPage() {
+function TableListPage() {
   const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { hasRole, isLoading: isRbacLoading } = useRBAC();
   const canManage = hasRole("admin", "manager");
@@ -539,5 +540,13 @@ export default function TableListPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function TablesPageWrapper() {
+  return (
+    <RouteGuard permission="table:view">
+      <TableListPage />
+    </RouteGuard>
   );
 }

@@ -11,6 +11,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config.settings import settings
 from app.models.staff import Role, User, UserRole
 from app.schemas.staff import (
     RoleOut,
@@ -160,9 +161,33 @@ async def create_staff(db: AsyncSession, payload: StaffCreate) -> StaffOut:
             detail=f"Invalid role code(s): {', '.join(missing)}",
         )
 
-    # 3. Create User record
+    # 3. Provision user in Clerk Backend API if CLERK_SECRET_KEY is configured
+    clerk_user_id = None
+    if settings.CLERK_SECRET_KEY and payload.password:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                c_resp = await client.post(
+                    "https://api.clerk.com/v1/users",
+                    headers={"Authorization": f"Bearer {settings.CLERK_SECRET_KEY}"},
+                    json={
+                        "email_address": [payload.email],
+                        "password": payload.password,
+                        "first_name": payload.first_name,
+                        "last_name": payload.last_name,
+                        "skip_password_checks": True,
+                    },
+                )
+                if c_resp.status_code in (200, 201):
+                    c_json = c_resp.json()
+                    clerk_user_id = c_json.get("id")
+        except Exception:
+            pass
+
+    # 4. Create User record
     user = User(
         email=payload.email,
+        clerk_user_id=clerk_user_id,
         first_name=payload.first_name,
         last_name=payload.last_name,
         phone=payload.phone,

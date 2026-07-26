@@ -18,6 +18,7 @@ export interface BillItem {
 export interface BillData {
   id: string;
   order_id: string;
+  session_id: string | null;
   bill_number: string;
   table_number: string | null;
   guest_name: string | null;
@@ -264,6 +265,30 @@ export async function confirmCashPayment(
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.detail ?? "Failed to record cash payment.");
   }
+  return res.json();
+}
+
+/**
+ * Dismiss a single notification
+ */
+export async function dismissNotification(token: string, notificationId: string): Promise<{ message: string }> {
+  const res = await fetch(`${API}/api/v1/billing/notifications/${notificationId}/read`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return { message: "" };
+  return res.json();
+}
+
+/**
+ * Clear all waiter notifications
+ */
+export async function clearAllNotifications(token: string): Promise<{ message: string }> {
+  const res = await fetch(`${API}/api/v1/billing/notifications/waiter/clear-all`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return { message: "" };
   return res.json();
 }
 

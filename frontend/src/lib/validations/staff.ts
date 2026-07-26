@@ -18,6 +18,11 @@ export const staffCreateSchema = z.object({
     .max(50, "Phone number cannot exceed 50 characters")
     .optional()
     .nullable(),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .optional()
+    .nullable(),
   role_codes: z
     .array(z.string())
     .min(1, "At least one role must be assigned"),

@@ -370,3 +370,54 @@ async def resume_order(
         .where(Order.id == order.id)
     )
     return _build_order_out(final_res.scalar_one())
+
+
+async def get_waiter_active_orders(
+    db: AsyncSession,
+) -> list[OrderOut]:
+    """
+    Fetch orders for the waiter dashboard.
+    Shows orders that are active (pending/accepted/preparing/ready/paused)
+    OR completed but not yet fully paid (bill pending).
+    Excludes: cancelled orders, and completed orders where bill is paid.
+    """
+    from app.models.billing import Bill
+
+    # Get all non-cancelled, non-deleted orders
+    query = (
+        select(Order)
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.menu_item),
+            selectinload(Order.table),
+            selectinload(Order.guest_session),
+        )
+        .where(
+            Order.deleted_at.is_(None),
+            Order.status.in_(["pending", "accepted", "preparing", "ready", "paused", "completed"]),
+        )
+        .order_by(Order.created_at.asc())
+    )
+
+    result = await db.execute(query)
+    orders = result.scalars().all()
+
+    # For completed orders, check if bill is paid — exclude if paid
+    filtered = []
+    for order in orders:
+        if order.status != "completed":
+            filtered.append(order)
+            continue
+        # Check bill status
+        bill_res = await db.execute(
+            select(Bill).where(
+                Bill.order_id == order.id,
+                Bill.deleted_at.is_(None),
+            )
+        )
+        bill = bill_res.scalar_one_or_none()
+        # Include completed order only if bill doesn't exist or is not paid
+        if bill is None or bill.status != "paid":
+            filtered.append(order)
+        # If bill is paid — exclude from waiter dashboard
+
+    return [_build_order_out(o) for o in filtered]

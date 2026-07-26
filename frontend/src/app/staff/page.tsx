@@ -1,5 +1,6 @@
 "use client";
 
+import { RouteGuard } from "@/components/RouteGuard";
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -32,7 +33,7 @@ import {
   Shield,
 } from "lucide-react";
 
-export default function StaffListPage() {
+function StaffListPage() {
   const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { hasRole, isLoading: isRbacLoading } = useRBAC();
   const isAdmin = hasRole("admin");
@@ -494,5 +495,13 @@ export default function StaffListPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function StaffPageWrapper() {
+  return (
+    <RouteGuard permission="staff:view">
+      <StaffListPage />
+    </RouteGuard>
   );
 }

@@ -49,6 +49,17 @@ export default function BillingPage() {
     }
   }, [billId]);
 
+  // Load Razorpay checkout script
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
   const loadBillData = async () => {
     try {
       setLoading(true);
@@ -101,30 +112,73 @@ export default function BillingPage() {
         const options = {
           key: rzpOrder.key_id,
           amount: rzpOrder.amount_paise,
-          currency: rzpOrder.currency,
+          currency: "INR",
           name: "Smart Restaurant",
           description: `Bill ${bill.bill_number}`,
           order_id: rzpOrder.razorpay_order_id,
+          prefill: {
+            name: bill.guest_name || "",
+            email: bill.guest_email || "",
+          },
+          config: {
+            display: {
+              blocks: {
+                utib: {
+                  name: "Pay using UPI",
+                  instruments: [
+                    { method: "upi" },
+                  ],
+                },
+                other: {
+                  name: "Other Payment Methods",
+                  instruments: [
+                    { method: "card" },
+                    { method: "netbanking" },
+                    { method: "wallet" },
+                  ],
+                },
+              },
+              sequence: ["block.utib", "block.other"],
+              preferences: {
+                show_default_blocks: false,
+              },
+            },
+          },
           handler: async function (response: {
             razorpay_payment_id: string;
             razorpay_order_id: string;
             razorpay_signature: string;
           }) {
-            // 3. Backend HMAC Verification
-            await verifyRazorpayPayment({
-              bill_id: bill.id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              amount: targetAmount,
-            });
-            setSuccessMsg("Payment completed successfully!");
-            await loadBillData();
+            try {
+              // 3. Backend HMAC Verification
+              await verifyRazorpayPayment({
+                bill_id: bill.id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                amount: targetAmount,
+              });
+              setSuccessMsg("Payment completed successfully!");
+              await loadBillData();
+            } catch (err: unknown) {
+              const e = err as Error;
+              setErrorMsg(e.message || "Payment verification failed. Please contact staff.");
+            } finally {
+              setIsProcessingPayment(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              setIsProcessingPayment(false);
+              setErrorMsg(null);
+            },
           },
           theme: { color: "#6366f1" },
         };
         const rzp = new (window as unknown as { Razorpay: new (opts: unknown) => { open: () => void } }).Razorpay(options);
         rzp.open();
+        // Don't set isProcessingPayment to false here — handler or ondismiss will do it
+        return;
       } else {
         // Dev fallback simulation with HMAC backend verification
         const mockPayId = `pay_mock_${Date.now()}`;
@@ -149,7 +203,7 @@ export default function BillingPage() {
 
   const handleCashPayment = async () => {
     if (!bill || !authToken) {
-      setErrorMsg("Manager or Cashier login required for cash settlement.");
+      setErrorMsg("Staff login required for cash payment. Please ask the cashier or waiter to confirm cash payment.");
       return;
     }
     try {
@@ -170,10 +224,10 @@ export default function BillingPage() {
   };
 
   const handleUnlockSession = async () => {
-    if (!bill || !authToken) return;
+    if (!bill || !authToken || !bill.session_id) return;
     try {
       setErrorMsg(null);
-      await unlockSession(authToken, bill.order_id);
+      await unlockSession(authToken, bill.session_id);
       setSuccessMsg("Dining session unlocked by Manager.");
       await loadBillData();
     } catch (err: unknown) {

@@ -105,6 +105,19 @@ async def list_tables(
 
 
 @router.get(
+    "/cleaning-queue",
+    summary="Get all tables pending cleaning (status=cleaning)",
+    status_code=status.HTTP_200_OK,
+)
+async def get_cleaning_queue(
+    _: User = Depends(require_role(["cleaning_staff", "waiter", "manager", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Returns all tables currently in 'cleaning' status."""
+    return await table_service.get_cleaning_queue(db)
+
+
+@router.get(
     "/{table_id}",
     response_model=TableOut,
     summary="Get table details",
@@ -187,3 +200,18 @@ async def delete_table(
 ) -> None:
     """Soft delete a dining table."""
     await table_service.delete_table(db, table_id)
+
+
+@router.post(
+    "/{table_id}/mark-clean",
+    response_model=TableOut,
+    summary="Mark a table as clean and available",
+    status_code=status.HTTP_200_OK,
+)
+async def mark_table_clean(
+    table_id: uuid.UUID,
+    current_user: User = Depends(require_role(["cleaning_staff", "waiter", "manager", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Cleaning staff marks a table as clean, setting status back to available."""
+    return await table_service.mark_table_clean(db, table_id, current_user)

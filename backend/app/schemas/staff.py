@@ -48,6 +48,7 @@ class StaffCreate(BaseModel):
     last_name: Annotated[str, Field(min_length=1, max_length=100)]
     email: EmailStr
     phone: Annotated[str | None, Field(max_length=50)] = None
+    password: Annotated[str | None, Field(min_length=6, max_length=100)] = None
     role_codes: list[str] = Field(
         min_length=1, description="List of role codes to assign (e.g., ['waiter'])"
     )

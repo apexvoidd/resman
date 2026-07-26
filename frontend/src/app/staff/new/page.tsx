@@ -201,8 +201,11 @@ export default function AddStaffPage() {
                   type="email"
                   {...register("email")}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-orange-500"
-                  placeholder="e.g. john.doe@restaurant.com"
+                  placeholder="e.g. staff.member@gmail.com"
                 />
+                <p className="text-[11px] text-sky-400 mt-1 font-medium">
+                  💡 Use the valid email address (or Gmail) that the staff member uses to sign in. Their Clerk login will automatically inherit the assigned roles upon sign-in.
+                </p>
                 {errors.email && (
                   <p className="text-xs text-rose-400 mt-1">{errors.email.message}</p>
                 )}
@@ -220,6 +223,24 @@ export default function AddStaffPage() {
                 />
                 {errors.phone && (
                   <p className="text-xs text-rose-400 mt-1">{errors.phone.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Login Password (for Password Sign-In)
+                </label>
+                <input
+                  type="password"
+                  {...register("password")}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-orange-500"
+                  placeholder="Set initial staff login password"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Allows direct Email + Password sign-in at <code>/sign-in</code> without OTP.
+                </p>
+                {errors.password && (
+                  <p className="text-xs text-rose-400 mt-1">{errors.password.message}</p>
                 )}
               </div>
             </div>
