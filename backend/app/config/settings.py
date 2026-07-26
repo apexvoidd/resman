@@ -17,8 +17,8 @@ class Settings(BaseSettings):
 
     # Security
     SECRET_KEY: str = "default-insecure-secret-key-change-in-production"
-    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "0.0.0.0", "test", "testserver", "*"]
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    ALLOWED_HOSTS: str | list[str] = ["localhost", "127.0.0.1", "0.0.0.0", "test", "testserver", "*"]
+    CORS_ORIGINS: str | list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # Database
     DATABASE_URL: str = (
