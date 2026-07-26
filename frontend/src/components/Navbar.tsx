@@ -107,6 +107,17 @@ export function Navbar() {
     ? roles[0].name
     : "Staff";
 
+  function getActiveThemeClass(href: string) {
+    if (href.startsWith("/manager")) return "bg-indigo-500/20 text-indigo-300 border-indigo-500/40 shadow font-bold";
+    if (href.startsWith("/waiter")) return "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow font-bold";
+    if (href.startsWith("/cashier")) return "bg-yellow-500/20 text-yellow-300 border-yellow-500/40 shadow font-bold";
+    if (href.startsWith("/kitchen")) return "bg-amber-500/20 text-amber-300 border-amber-500/40 shadow font-bold";
+    if (href.startsWith("/cleaning")) return "bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow font-bold";
+    if (href.startsWith("/tables")) return "bg-purple-500/20 text-purple-300 border-purple-500/40 shadow font-bold";
+    if (href.startsWith("/menu")) return "bg-orange-500/20 text-orange-300 border-orange-500/40 shadow font-bold";
+    return "bg-slate-800 text-white font-bold border-slate-700 shadow-sm";
+  }
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-slate-900/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6">
@@ -133,10 +144,10 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center space-x-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                className={`flex items-center space-x-1.5 rounded-xl px-3 py-1.5 text-xs font-medium border transition ${
                   isActive
-                    ? "bg-slate-800 text-white font-semibold border border-slate-700 shadow-sm"
-                    : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                    ? getActiveThemeClass(link.href)
+                    : "border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
                 }`}
               >
                 <span>{link.icon}</span>
@@ -159,7 +170,7 @@ export function Navbar() {
       </div>
 
       {/* Mobile Scrollable Navigation Bar */}
-      <nav className="md:hidden flex items-center space-x-1 border-t border-slate-800/80 px-4 py-2 overflow-x-auto scrollbar-none bg-slate-900">
+      <nav className="md:hidden flex items-center space-x-1 border-t border-slate-800/80 px-3 py-2 overflow-x-auto scrollbar-none bg-slate-900/90 backdrop-blur">
         {visibleLinks.map((link) => {
           const isActive =
             pathname === link.href ||
@@ -168,10 +179,10 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`flex items-center space-x-1 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
+              className={`flex items-center space-x-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-[11px] border transition ${
                 isActive
-                  ? "bg-slate-800 text-white font-semibold border border-slate-700"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                  ? getActiveThemeClass(link.href)
+                  : "border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200"
               }`}
             >
               <span>{link.icon}</span>

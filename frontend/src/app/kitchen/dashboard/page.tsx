@@ -250,54 +250,52 @@ function KitchenDashboardPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 p-4 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Top KDS Bar with Flame Amber & Warm Orange Theme */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-3xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-transparent p-5 backdrop-blur-xl shadow-xl">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-2xl shadow ring-1 ring-amber-500/30">🍳</span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-black text-white tracking-tight">Kitchen Display System</h1>
-                  <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-black uppercase text-amber-300 ring-1 ring-amber-500/40">
-                    KDS Station
-                  </span>
-                </div>
-                <p className="text-xs text-amber-200/70">Real-time dish preparation, timing estimates, and station workflow</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 rounded-2xl sm:rounded-3xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-transparent p-3.5 sm:p-5 backdrop-blur-xl shadow-xl">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl bg-amber-500/20 text-xl sm:text-2xl shadow ring-1 ring-amber-500/30">🍳</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg sm:text-2xl font-black text-white tracking-tight">Kitchen KDS</h1>
+                <span className="rounded-full bg-amber-500/20 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-black uppercase text-amber-300 ring-1 ring-amber-500/40">
+                  Station
+                </span>
               </div>
+              <p className="hidden sm:block text-xs text-amber-200/70">Real-time dish preparation, timing estimates, and station workflow</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 text-xs font-bold">
-            <div className="flex-1 sm:flex-none text-center rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-amber-300 shadow">
+          <div className="flex items-center justify-between sm:justify-end gap-2 text-[11px] sm:text-xs font-bold">
+            <div className="flex-1 sm:flex-none text-center rounded-lg sm:rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 sm:px-4 py-1.5 sm:py-2 text-amber-300 shadow">
               Pending: {pendingCount}
             </div>
-            <div className="flex-1 sm:flex-none text-center rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-blue-300 shadow">
+            <div className="flex-1 sm:flex-none text-center rounded-lg sm:rounded-xl border border-blue-500/30 bg-blue-500/10 px-2.5 sm:px-4 py-1.5 sm:py-2 text-blue-300 shadow">
               Preparing: {preparingCount}
             </div>
-            <div className="flex-1 sm:flex-none text-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-emerald-300 shadow">
+            <div className="flex-1 sm:flex-none text-center rounded-lg sm:rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2.5 sm:px-4 py-1.5 sm:py-2 text-emerald-300 shadow">
               Ready: {readyCount}
             </div>
           </div>
         </div>
 
         {errorMsg && (
-          <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 sm:p-4 text-xs sm:text-sm text-red-400">
             {errorMsg}
           </div>
         )}
 
         {/* Toolbar: Search, Status Tabs & Sorting */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 rounded-2xl border border-gray-800 bg-gray-900 p-4">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="🔍 Search Order Number..."
-            className="w-full md:w-72 rounded-xl bg-gray-950 px-4 py-2 text-xs text-white placeholder-gray-500 ring-1 ring-white/10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+            className="w-full md:w-64 rounded-xl bg-gray-950 px-3.5 py-2 text-xs text-white placeholder-gray-500 ring-1 ring-white/10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
           />
 
-          <div className="flex overflow-x-auto gap-2 no-scrollbar">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none whitespace-nowrap">
             {[
-              { label: "All Active", value: "active" },
+              { label: "Active", value: "active" },
               { label: "Pending", value: "pending" },
               { label: "Accepted", value: "accepted" },
               { label: "Preparing", value: "preparing" },
