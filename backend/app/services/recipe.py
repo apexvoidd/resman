@@ -328,7 +328,9 @@ async def deduct_inventory_for_order(
                 recipient_type="kitchen_staff",
                 title=f"🚨 Stock Insufficient for Order {order.order_number}",
                 message=err_msg,
-                link="/inventory",
+                notification_type="system_alert",
+                status="unread",
+                payload_json={"link": "/inventory"},
             )
         )
         await db.commit()

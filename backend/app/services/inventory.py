@@ -499,7 +499,9 @@ async def adjust_stock(
                 recipient_type="kitchen_staff",
                 title=f"⚠️ {status_lbl}: {ing.name}",
                 message=f"Stock level for '{ing.name}' is now {new_qty} {ing.unit_of_measure} (Min threshold: {ing.minimum_stock}).",
-                link="/inventory",
+                notification_type="system_alert",
+                status="unread",
+                payload_json={"link": "/inventory"},
             )
         )
 
