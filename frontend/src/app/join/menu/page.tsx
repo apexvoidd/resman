@@ -7,6 +7,7 @@ import { Category, fetchCategories, fetchMenuItems, MenuItem } from "@/services/
 import { cancelOrder, fetchSessionOrders, OrderOut, placeOrder, updateOrder } from "@/services/order";
 import { useCartStore } from "@/store/use-cart-store";
 import { fetchSessionBill, requestBill, BillData } from "@/services/billing";
+import { getSafeImageUrl } from "@/lib/utils";
 
 export default function CustomerSeatedMenuPage() {
   const [sessionToken, setSessionToken] = useState<string | null>(null);
@@ -362,8 +363,21 @@ export default function CustomerSeatedMenuPage() {
               >
                 <div>
                   <div className="relative h-40 w-full overflow-hidden rounded-xl bg-gray-950 flex items-center justify-center">
-                    {dish.image_url ? (
-                      <img src={dish.image_url} alt={dish.name} className="h-full w-full object-cover" />
+                    {getSafeImageUrl(dish.image_url) ? (
+                      <img
+                        src={getSafeImageUrl(dish.image_url)!}
+                        alt={dish.name}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                          if (e.currentTarget.parentElement) {
+                            const fallback = document.createElement("span");
+                            fallback.className = "text-4xl";
+                            fallback.innerText = "🍲";
+                            e.currentTarget.parentElement.appendChild(fallback);
+                          }
+                        }}
+                      />
                     ) : (
                       <span className="text-4xl">🍲</span>
                     )}

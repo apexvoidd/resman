@@ -7,6 +7,7 @@ import {
   fetchMenuItems,
   MenuItem,
 } from "@/services/menu";
+import { getSafeImageUrl } from "@/lib/utils";
 
 export default function PublicMenuPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -194,11 +195,20 @@ export default function PublicMenuPage() {
               >
                 {/* Dish Image Container */}
                 <div className="relative h-48 w-full bg-gray-950 overflow-hidden flex items-center justify-center">
-                  {dish.image_url ? (
+                  {getSafeImageUrl(dish.image_url) ? (
                     <img
-                      src={dish.image_url}
+                      src={getSafeImageUrl(dish.image_url)!}
                       alt={dish.name}
                       className="h-full w-full object-cover group-hover:scale-105 transition duration-500"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = "none";
+                        if (e.currentTarget.parentElement) {
+                          const fallback = document.createElement("span");
+                          fallback.className = "text-5xl opacity-80";
+                          fallback.innerText = "🍲";
+                          e.currentTarget.parentElement.appendChild(fallback);
+                        }
+                      }}
                     />
                   ) : (
                     <span className="text-5xl opacity-80">🍲</span>
@@ -280,8 +290,21 @@ export default function PublicMenuPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl space-y-4">
             <div className="relative h-56 bg-gray-950 overflow-hidden flex items-center justify-center">
-              {selectedDish.image_url ? (
-                <img src={selectedDish.image_url} alt={selectedDish.name} className="h-full w-full object-cover" />
+              {getSafeImageUrl(selectedDish.image_url) ? (
+                <img
+                  src={getSafeImageUrl(selectedDish.image_url)!}
+                  alt={selectedDish.name}
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = "none";
+                    if (e.currentTarget.parentElement) {
+                      const fallback = document.createElement("span");
+                      fallback.className = "text-6xl";
+                      fallback.innerText = "🍲";
+                      e.currentTarget.parentElement.appendChild(fallback);
+                    }
+                  }}
+                />
               ) : (
                 <span className="text-6xl">🍲</span>
               )}

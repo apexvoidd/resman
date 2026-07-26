@@ -12,6 +12,7 @@ import {
   MenuItem,
   toggleMenuItemAvailability,
 } from "@/services/menu";
+import { getSafeImageUrl } from "@/lib/utils";
 
 export default function MenuItemListPage() {
   const { getToken } = useAuth();
@@ -220,11 +221,20 @@ export default function MenuItemListPage() {
                 <div>
                   {/* Dish Image */}
                   <div className="relative h-44 w-full bg-gray-950 overflow-hidden flex items-center justify-center">
-                    {item.image_url ? (
+                    {getSafeImageUrl(item.image_url) ? (
                       <img
-                        src={item.image_url}
+                        src={getSafeImageUrl(item.image_url)!}
                         alt={item.name}
                         className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                          if (e.currentTarget.parentElement) {
+                            const fallback = document.createElement("span");
+                            fallback.className = "text-4xl";
+                            fallback.innerText = "🍲";
+                            e.currentTarget.parentElement.appendChild(fallback);
+                          }
+                        }}
                       />
                     ) : (
                       <span className="text-4xl">🍲</span>

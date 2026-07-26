@@ -13,6 +13,7 @@ import {
   uploadLogo,
   RestaurantSettings,
 } from "@/services/settings";
+import { getSafeImageUrl } from "@/lib/utils";
 import {
   settingsSchema,
   SettingsFormValues,
@@ -245,12 +246,21 @@ function SettingsPage() {
             {/* Logo display & upload */}
             <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-slate-950/60 border border-slate-800/80 rounded-xl">
               <div className="w-24 h-24 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
-                {settings?.logo_url ? (
+                {getSafeImageUrl(settings?.logo_url) ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
-                    src={settings.logo_url}
+                    src={getSafeImageUrl(settings?.logo_url)!}
                     alt="Restaurant Logo"
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none";
+                      if (e.currentTarget.parentElement) {
+                        const fallback = document.createElement("span");
+                        fallback.className = "text-3xl";
+                        fallback.innerText = "🍽️";
+                        e.currentTarget.parentElement.appendChild(fallback);
+                      }
+                    }}
                   />
                 ) : (
                   <span className="text-3xl">🍽️</span>
