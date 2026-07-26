@@ -60,7 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
     app.include_router(api_router, prefix=settings.API_V1_STR)
 
-    # Mount static files for local upload fallback
+    # Mount static files if upload directory exists
     from pathlib import Path
     from fastapi.staticfiles import StaticFiles
     upload_dir = Path(__file__).resolve().parent.parent / "uploads"

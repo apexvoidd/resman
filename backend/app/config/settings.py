@@ -33,17 +33,10 @@ class Settings(BaseSettings):
     # Cache (Redis / Upstash)
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # Storage Configuration (Supabase Storage / Cloudflare R2 / Local Fallback)
+    # Supabase Storage Configuration
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
-    SUPABASE_BUCKET_NAME: str = ""
-
-    # Cloudflare R2 Storage Placeholder Config
-    R2_ACCOUNT_ID: str = ""
-    R2_ACCESS_KEY_ID: str = ""
-    R2_SECRET_ACCESS_KEY: str = ""
-    R2_BUCKET_NAME: str = ""
-    R2_PUBLIC_DOMAIN: str = ""
+    SUPABASE_BUCKET_NAME: str = "uploads"
 
     # Razorpay Payment Gateway
     RAZORPAY_KEY_ID: str = ""

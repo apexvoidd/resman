@@ -28,7 +28,7 @@ The Smart Restaurant Management System is built on a decoupled, modular architec
 | **Backend** | FastAPI, Python 3.12+, Pydantic v2 | Railway |
 | **Database** | PostgreSQL 16, SQLAlchemy 2.x Async, Alembic | Neon |
 | **Caching** | Redis | Upstash |
-| **Object Storage** | Supabase Storage / Cloudflare R2 / Local | Supabase / Cloudflare R2 / Local |
+| **Object Storage** | Supabase Storage | Supabase |
 | **Realtime Messaging** | WebSockets / Server-Sent Events | Pusher / Ably Ready |
 | **Monitoring** | Error Tracking | Sentry |
 | **Logging** | Structured JSON Logs | Better Stack |

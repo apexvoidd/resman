@@ -1,24 +1,18 @@
 """
-Cloudflare R2 upload service using aioboto3 (S3-compatible API).
-
-R2 endpoint format: https://<account_id>.r2.cloudflarestorage.com
+Supabase Storage Service.
+Handles image validation and direct uploads to Supabase Storage.
 """
 
 import logging
 import mimetypes
-from pathlib import Path
 import uuid
 
-import aioboto3
-from botocore.config import Config
+import httpx
 from fastapi import HTTPException, UploadFile, status
 
 from app.config.settings import settings
 
-logger = logging.getLogger("app.services.r2")
-
-# Base upload directory for local fallback (absolute path relative to backend root)
-BASE_UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
+logger = logging.getLogger("app.services.storage")
 
 # Allowed mime types and normalization mapping
 _MIME_NORMALIZATION = {
@@ -39,10 +33,6 @@ _ALLOWED_TYPES = {
 _MAX_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
-def _r2_endpoint() -> str:
-    return f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-
-
 def _is_supabase_configured() -> bool:
     return bool(
         settings.SUPABASE_URL
@@ -52,83 +42,10 @@ def _is_supabase_configured() -> bool:
     )
 
 
-def _is_r2_configured() -> bool:
-    return bool(
-        settings.R2_ACCOUNT_ID
-        and settings.R2_ACCESS_KEY_ID
-        and settings.R2_SECRET_ACCESS_KEY
-        and settings.R2_BUCKET_NAME
-        and not settings.R2_ACCOUNT_ID.startswith("your-")
-    )
-
-
-async def _upload_to_supabase(data: bytes, content_type: str, folder: str) -> str:
-    """Upload file bytes to Supabase Storage REST API and return public URL."""
-    import httpx
-
-    ext = mimetypes.guess_extension(content_type) or ".jpg"
-    ext = ext.replace(".jpe", ".jpg").replace(".jpeg", ".jpg")
-    if content_type == "image/svg+xml":
-        ext = ".svg"
-    elif content_type == "image/avif":
-        ext = ".avif"
-
-    filename = f"{uuid.uuid4().hex}{ext}"
-    object_path = f"{folder}/{filename}"
-
-    base_url = settings.SUPABASE_URL.rstrip("/")
-    bucket = settings.SUPABASE_BUCKET_NAME.strip()
-
-    upload_url = f"{base_url}/storage/v1/object/{bucket}/{object_path}"
-    headers = {
-        "Authorization": f"Bearer {settings.SUPABASE_KEY}",
-        "apiKey": settings.SUPABASE_KEY,
-        "Content-Type": content_type,
-        "x-upsert": "true",
-    }
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(upload_url, content=data, headers=headers)
-        if resp.status_code not in (200, 201):
-            logger.error("Supabase Storage upload failed [%s]: %s", resp.status_code, resp.text)
-            raise RuntimeError(f"Supabase Storage upload failed ({resp.status_code}): {resp.text}")
-
-    public_url = f"{base_url}/storage/v1/object/public/{bucket}/{object_path}"
-    logger.info("File uploaded to Supabase Storage: %s", public_url)
-    return public_url
-
-
-async def _save_locally(file_data: bytes, content_type: str, folder: str) -> str:
-    """Save file bytes locally and return public URL."""
-    upload_dir = BASE_UPLOAD_DIR / folder
-    upload_dir.mkdir(parents=True, exist_ok=True)
-
-    ext = mimetypes.guess_extension(content_type) or ".jpg"
-    ext = ext.replace(".jpe", ".jpg").replace(".jpeg", ".jpg")
-    if content_type == "image/svg+xml":
-        ext = ".svg"
-    elif content_type == "image/avif":
-        ext = ".avif"
-
-    filename = f"{uuid.uuid4().hex}{ext}"
-    file_path = upload_dir / filename
-
-    with open(file_path, "wb") as f:
-        f.write(file_data)
-
-    if settings.PUBLIC_BASE_URL:
-        host = settings.PUBLIC_BASE_URL.rstrip("/")
-    else:
-        host = f"http://localhost:{settings.PORT}" if settings.PORT else "http://localhost:8000"
-    public_url = f"{host}/uploads/{folder}/{filename}"
-    logger.info("Saved image locally to %s -> %s", file_path, public_url)
-    return public_url
-
-
-async def upload_file_to_r2(file: UploadFile, folder: str = "uploads") -> str:
+async def upload_file_to_supabase(file: UploadFile, folder: str = "uploads") -> str:
     """
-    Validate and upload an image file to Cloudflare R2 under a specific folder.
-    Falls back to local file storage when R2 is not configured or if R2 upload fails.
+    Validate and upload an image file directly to Supabase Storage under a specific folder.
+    Returns the public HTTPS URL for the uploaded object.
     """
     # ── Read file content first ───────────────────────────────────────────────
     data = await file.read()
@@ -151,56 +68,61 @@ async def upload_file_to_r2(file: UploadFile, folder: str = "uploads") -> str:
             detail=f"File size exceeds limit ({_MAX_SIZE_BYTES // (1024 * 1024)} MB max).",
         )
 
-    if _is_supabase_configured():
-        try:
-            return await _upload_to_supabase(data, content_type, folder)
-        except Exception as exc:
-            logger.warning("Supabase upload failed (%s). Falling back.", exc)
+    if not _is_supabase_configured():
+        logger.error("Supabase Storage is not configured in settings.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Storage is not properly configured. SUPABASE_URL, SUPABASE_KEY, and SUPABASE_BUCKET_NAME are required.",
+        )
 
-    if not _is_r2_configured():
-        return await _save_locally(data, content_type, folder)
-
-    # ── Build unique object key ───────────────────────────────────────────────
     ext = mimetypes.guess_extension(content_type) or ".jpg"
     ext = ext.replace(".jpe", ".jpg").replace(".jpeg", ".jpg")
     if content_type == "image/svg+xml":
         ext = ".svg"
     elif content_type == "image/avif":
         ext = ".avif"
-    object_key = f"{folder}/{uuid.uuid4().hex}{ext}"
 
-    # ── Upload via aioboto3 with fallback to local ────────────────────────────
+    filename = f"{uuid.uuid4().hex}{ext}"
+    object_path = f"{folder}/{filename}"
+
+    base_url = settings.SUPABASE_URL.rstrip("/")
+    bucket = settings.SUPABASE_BUCKET_NAME.strip()
+
+    upload_url = f"{base_url}/storage/v1/object/{bucket}/{object_path}"
+    headers = {
+        "Authorization": f"Bearer {settings.SUPABASE_KEY}",
+        "apiKey": settings.SUPABASE_KEY,
+        "Content-Type": content_type,
+        "x-upsert": "true",
+    }
+
     try:
-        session = aioboto3.Session()
-        async with session.client(
-            "s3",
-            endpoint_url=_r2_endpoint(),
-            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-            region_name="auto",
-            config=Config(signature_version="s3v4"),
-        ) as s3:
-            await s3.put_object(
-                Bucket=settings.R2_BUCKET_NAME,
-                Key=object_key,
-                Body=data,
-                ContentType=content_type,
-                CacheControl="public, max-age=31536000",
-            )
-
-        if settings.R2_PUBLIC_DOMAIN:
-            public_url = f"https://{settings.R2_PUBLIC_DOMAIN.rstrip('/')}/{object_key}"
-        else:
-            public_url = f"{_r2_endpoint()}/{settings.R2_BUCKET_NAME}/{object_key}"
-
-        logger.info("File uploaded to R2: %s", public_url)
-        return public_url
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(upload_url, content=data, headers=headers)
+            if resp.status_code not in (200, 201):
+                logger.error("Supabase Storage upload failed [%s]: %s", resp.status_code, resp.text)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Supabase Storage error ({resp.status_code}): {resp.text}",
+                )
+    except HTTPException:
+        raise
     except Exception as exc:
-        logger.warning("R2 upload failed (%s). Falling back to local file storage.", exc)
-        return await _save_locally(data, content_type, folder)
+        logger.error("Failed to upload file to Supabase Storage: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload file to storage: {str(exc)}",
+        ) from exc
+
+    public_url = f"{base_url}/storage/v1/object/public/{bucket}/{object_path}"
+    logger.info("File successfully uploaded to Supabase Storage: %s", public_url)
+    return public_url
+
+
+# Backward-compatible alias exports
+upload_file_to_r2 = upload_file_to_supabase
 
 
 async def upload_logo(file: UploadFile) -> str:
-    """Upload logo image to Cloudflare R2 (or local fallback)."""
-    return await upload_file_to_r2(file, folder="logos")
-
+    """Upload logo image to Supabase Storage."""
+    return await upload_file_to_supabase(file, folder="logos")
