@@ -54,9 +54,9 @@ function CashierPOSPage() {
   const [notes, setNotes] = useState<string>("");
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
-  const loadBills = async () => {
+  const loadBills = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setErrorMsg(null);
       const token = await getToken().catch(() => null);
 
@@ -72,18 +72,18 @@ function CashierPOSPage() {
       setBills(data);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Failed to load billing records.");
+      if (!isSilent) setErrorMsg(err.message || "Failed to load billing records.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
     if (!rbacLoading && isAuthorized) {
-      loadBills();
+      loadBills(false);
       const interval = setInterval(() => {
-        loadBills();
-      }, 10000);
+        loadBills(true);
+      }, 3000);
       return () => clearInterval(interval);
     }
   }, [rbacLoading, isAuthorized]);
@@ -178,7 +178,7 @@ function CashierPOSPage() {
 
             <div className="flex items-center space-x-2">
               <button
-                onClick={loadBills}
+                onClick={() => loadBills(false)}
                 disabled={loading}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 text-xs font-medium text-slate-200 transition"
               >

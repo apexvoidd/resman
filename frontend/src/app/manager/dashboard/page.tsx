@@ -35,9 +35,9 @@ export default function ManagerDashboardPage() {
   const [broadcastPriority, setBroadcastPriority] = useState<string>("urgent");
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
-  const loadManagerData = async () => {
+  const loadManagerData = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setErrorMsg(null);
       const token = await getToken().catch(() => null);
 
@@ -50,15 +50,19 @@ export default function ManagerDashboardPage() {
       setRecipes(recData);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Failed to load manager dashboard metrics.");
+      if (!isSilent) setErrorMsg(err.message || "Failed to load manager dashboard metrics.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
     if (!rbacLoading && isAuthorized) {
-      loadManagerData();
+      loadManagerData(false);
+      const interval = setInterval(() => {
+        loadManagerData(true);
+      }, 3000);
+      return () => clearInterval(interval);
     }
   }, [rbacLoading, isAuthorized]);
 
@@ -154,7 +158,7 @@ export default function ManagerDashboardPage() {
 
             <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={loadManagerData}
+                onClick={() => loadManagerData(false)}
                 disabled={loading}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 text-xs font-medium text-slate-200 transition"
               >

@@ -120,6 +120,7 @@ function TableListPage() {
       });
     },
     enabled: !!isSignedIn,
+    refetchInterval: 3000,
   });
 
   // Toggle active / status mutation

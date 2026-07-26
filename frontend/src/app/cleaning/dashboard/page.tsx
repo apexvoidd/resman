@@ -66,7 +66,7 @@ function CleaningDashboardPage() {
   useEffect(() => {
     if (isLoading || !isAuthorized) return;
     loadTables();
-    const interval = setInterval(loadTables, 5000);
+    const interval = setInterval(loadTables, 3000);
     return () => clearInterval(interval);
   }, [isLoading, isAuthorized]);
 
