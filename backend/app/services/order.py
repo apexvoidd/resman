@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from app.models.customer import GuestSession
 from app.models.menu import MenuItem
 from app.models.order import Order, OrderItem, OrderStatusHistory
+from app.models.recipe import Recipe, RecipeIngredient, Ingredient
 from app.models.table import DiningTable
 from app.schemas.order import (
     OrderCreate,
@@ -174,9 +175,11 @@ async def create_customer_order(
         logger.info("Duplicate order submission prevented for session %s", session.session_token)
         return _build_order_out(recent_order)
 
-    # 3. Validate Menu Items & Availability
+    # 3. Validate Menu Items, Availability & Ingredient Portion Stock
     subtotal = 0.0
     order_items_data = []
+    required_ingredients: dict[UUID, float] = {}
+    item_ingredient_map: list[tuple[MenuItem, int]] = []
 
     for item_in in payload.items:
         if item_in.quantity < 1:
@@ -186,7 +189,13 @@ async def create_customer_order(
             )
 
         menu_res = await db.execute(
-            select(MenuItem).where(
+            select(MenuItem)
+            .options(
+                selectinload(MenuItem.recipes)
+                .selectinload(Recipe.recipe_ingredients)
+                .selectinload(RecipeIngredient.ingredient)
+            )
+            .where(
                 MenuItem.id == item_in.menu_item_id, MenuItem.deleted_at.is_(None)
             )
         )
@@ -203,6 +212,17 @@ async def create_customer_order(
                 detail=f"Item '{menu_item.name}' is currently unavailable for ordering.",
             )
 
+        # Aggregate required ingredients for recipe validation
+        if menu_item.recipes:
+            rec = menu_item.recipes[0]
+            for ri in rec.recipe_ingredients:
+                needed = float(ri.quantity) * item_in.quantity
+                required_ingredients[ri.ingredient_id] = (
+                    required_ingredients.get(ri.ingredient_id, 0.0) + needed
+                )
+
+        item_ingredient_map.append((menu_item, item_in.quantity))
+
         unit_p = float(menu_item.price)
         item_total = round(unit_p * item_in.quantity, 2)
         subtotal += item_total
@@ -216,6 +236,29 @@ async def create_customer_order(
                 "notes": item_in.special_instructions,
             }
         )
+
+    # Validate ingredient stock sufficiency across all items in the order
+    for ing_id, total_needed in required_ingredients.items():
+        ing_res = await db.execute(select(Ingredient).where(Ingredient.id == ing_id))
+        ing_obj = ing_res.scalar_one_or_none()
+        if ing_obj:
+            cur_stock = float(ing_obj.current_stock)
+            if cur_stock < total_needed:
+                for m_item, req_qty in item_ingredient_map:
+                    if m_item.recipes:
+                        rec = m_item.recipes[0]
+                        for ri in rec.recipe_ingredients:
+                            if ri.ingredient_id == ing_id:
+                                single_req = float(ri.quantity)
+                                max_portions = int(cur_stock // single_req) if single_req > 0 else 0
+                                if max_portions == 0:
+                                    detail_msg = f"Cannot order '{m_item.name}'. Ingredient '{ing_obj.name}' is currently out of stock."
+                                else:
+                                    detail_msg = f"Cannot order {req_qty}x '{m_item.name}'. Only {max_portions} portion(s) available based on current '{ing_obj.name}' stock."
+                                raise HTTPException(
+                                    status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail=detail_msg,
+                                )
 
     # 4. Atomic Transaction Creation
     tax_amt = round(subtotal * TAX_RATE, 2)

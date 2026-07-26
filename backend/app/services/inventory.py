@@ -335,6 +335,9 @@ async def update_ingredient(
         )
     )
 
+    from app.services.recipe import sync_menu_availability_for_ingredient
+    await sync_menu_availability_for_ingredient(db, ing.id)
+
     await db.commit()
     return await get_ingredient_by_id(db, ing.id)
 
@@ -505,6 +508,9 @@ async def adjust_stock(
             )
         )
 
+    from app.services.recipe import sync_menu_availability_for_ingredient
+    await sync_menu_availability_for_ingredient(db, ing.id)
+
     await db.commit()
     return await get_ingredient_by_id(db, ing.id)
 
@@ -560,6 +566,9 @@ async def record_waste(
             recorded_by_user_id=user_id,
         )
     )
+
+    from app.services.recipe import sync_menu_availability_for_ingredient
+    await sync_menu_availability_for_ingredient(db, ing.id)
 
     await db.commit()
     await db.refresh(waste_rec)
