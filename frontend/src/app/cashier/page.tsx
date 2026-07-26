@@ -5,6 +5,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 import { RouteGuard } from "@/components/RouteGuard";
 import Link from "next/link";
+import { useToast } from "@/context/ToastContext";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -32,9 +33,10 @@ interface Bill {
   items: BillItem[];
 }
 
-function CashierPOSPage() {
+  function CashierPOSPage() {
   const { getToken } = useAuth();
   const { isLoading: rbacLoading, hasRole } = useRBAC();
+  const toast = useToast();
 
   const isAuthorized =
     hasRole("cashier") || hasRole("waiter") || hasRole("manager") || hasRole("admin");
@@ -132,11 +134,15 @@ function CashierPOSPage() {
         throw new Error(err?.detail ?? "Failed to record settlement.");
       }
 
-      setSuccessMsg(`Payment settled successfully for Bill #${selectedBill.bill_number}!`);
+      const msg = `Payment settled successfully for Bill #${selectedBill.bill_number}!`;
+      setSuccessMsg(msg);
+      toast.success(msg, "Bill Settled");
       setSelectedBill(null);
       loadBills();
     } catch (err: any) {
-      setErrorMsg(err.message || "Settlement failed.");
+      const msg = err.message || "Settlement failed.";
+      setErrorMsg(msg);
+      toast.error(msg, "Settlement Failed");
     } finally {
       setActionLoading(false);
     }

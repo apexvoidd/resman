@@ -23,12 +23,15 @@ import {
   Shield,
 } from "lucide-react";
 
+import { useToast } from "@/context/ToastContext";
+
 export default function AddStaffPage() {
   const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { hasRole, isLoading: isRbacLoading } = useRBAC();
   const isAdmin = hasRole("admin");
   const router = useRouter();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -71,10 +74,13 @@ export default function AddStaffPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff-list"] });
+      toast.success("Staff member created successfully!", "Staff Created");
       router.push("/staff");
     },
     onError: (err: Error) => {
-      setErrorMsg(err.message || "Failed to create staff member.");
+      const msg = err.message || "Failed to create staff member.";
+      setErrorMsg(msg);
+      toast.error(msg, "Creation Failed");
     },
   });
 

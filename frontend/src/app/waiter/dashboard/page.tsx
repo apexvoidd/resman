@@ -17,10 +17,12 @@ import { clearAllNotifications, dismissNotification, fetchWaiterNotifications, g
 import { toggleTableStatus, TableStatusType } from "@/services/table";
 import { fetchKDSOrders, fetchWaiterOrders } from "@/services/kds";
 import { OrderOut } from "@/services/order";
+import { useToast } from "@/context/ToastContext";
 
 function WaiterDashboardPage() {
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
+  const toast = useToast();
 
   const [loading, setLoading] = useState<boolean>(true);
   const [verifications, setVerifications] = useState<PendingVerificationTable[]>([]);
@@ -152,10 +154,13 @@ function WaiterDashboardPage() {
       if (!token) return;
 
       await verifyCustomerArrival(token, tableId, "confirm");
+      toast.success("Guest arrival confirmed & table seated!", "Arrival Confirmed");
       await loadData();
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to confirm arrival.");
+      const msg = e.message || "Failed to confirm arrival.";
+      setErrorMsg(msg);
+      toast.error(msg, "Verification Error");
     } finally {
       setActionLoading(null);
     }
@@ -178,10 +183,13 @@ function WaiterDashboardPage() {
 
       setRejectingTableId(null);
       setRejectReason("");
+      toast.warning("Guest arrival rejected & table cleared.", "Arrival Rejected");
       await loadData();
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to reject arrival.");
+      const msg = e.message || "Failed to reject arrival.";
+      setErrorMsg(msg);
+      toast.error(msg, "Verification Error");
     } finally {
       setActionLoading(null);
     }

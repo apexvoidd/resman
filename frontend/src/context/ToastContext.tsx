@@ -84,15 +84,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={contextValue}>
       {children}
 
-      {/* Floating Slide-Up Toast Overlay Container (Always on top of all modals & screens) */}
+      {/* Floating Toast Overlay Container (Top on Mobile, Bottom-Right on Desktop) */}
       <div
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-[calc(100%-2rem)] sm:w-96 pointer-events-none"
+        className="fixed top-3 left-3 right-3 sm:top-auto sm:left-auto sm:bottom-6 sm:right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-[calc(100%-1.5rem)] sm:w-96 pointer-events-none mx-auto sm:mx-0"
         aria-live="polite"
       >
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border shadow-2xl backdrop-blur-xl transition-all duration-300 transform translate-y-0 animate-in slide-in-from-bottom-5 fade-in ${
+            className={`pointer-events-auto flex items-start gap-3 p-3.5 sm:p-4 rounded-2xl border shadow-2xl backdrop-blur-xl transition-all duration-300 transform translate-y-0 animate-in slide-in-from-top-4 sm:slide-in-from-bottom-5 fade-in ${
               t.type === "error"
                 ? "bg-slate-900/95 border-red-500/40 text-red-100 shadow-red-500/20 ring-1 ring-red-500/30"
                 : t.type === "success"
