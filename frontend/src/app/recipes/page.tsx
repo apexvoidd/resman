@@ -53,13 +53,15 @@ function RecipesPage() {
 
       const [recData, miData, ingData] = await Promise.all([
         fetchAllRecipes(token),
-        fetchMenuItems(token),
-        fetchIngredients(token, { is_active: true }),
+        fetchMenuItems(token, { page_size: 100 }),
+        fetchIngredients(token),
       ]);
 
-      setRecipes(recData);
-      setMenuItems(miData.items || []);
-      setAvailableIngredients(ingData);
+      setRecipes(Array.isArray(recData) ? recData : []);
+      const loadedMenuItems = Array.isArray(miData) ? miData : (miData?.items || []);
+      const loadedIngredients = Array.isArray(ingData) ? ingData : [];
+      setMenuItems(loadedMenuItems);
+      setAvailableIngredients(loadedIngredients);
       setErrorMsg(null);
     } catch (err: unknown) {
       const e = err as Error;
@@ -414,12 +416,22 @@ function RecipesPage() {
                     }}
                     className="mt-1 w-full rounded-xl bg-gray-950 px-3.5 py-2 text-white ring-1 ring-white/10 focus:outline-none"
                   >
+                    <option value="">
+                      {menuItems.length === 0
+                        ? "-- No Menu Items Found --"
+                        : "-- Select Target Menu Item --"}
+                    </option>
                     {menuItems.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name} (${m.price.toFixed(2)})
+                        {m.name} (₹{m.price.toFixed(2)})
                       </option>
                     ))}
                   </select>
+                  {menuItems.length === 0 && (
+                    <p className="mt-1 text-[11px] text-amber-400">
+                      ⚠️ No menu items available. Create menu items in Menu Management first.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -466,7 +478,11 @@ function RecipesPage() {
                         onChange={(e) => handleIngredientChange(index, "ingredient_id", e.target.value)}
                         className="w-1/2 rounded-lg bg-gray-900 px-3 py-1.5 text-white ring-1 ring-white/10 focus:outline-none"
                       >
-                        <option value="">Select Ingredient</option>
+                        <option value="">
+                          {availableIngredients.length === 0
+                            ? "-- No Ingredients Found --"
+                            : "-- Select Ingredient --"}
+                        </option>
                         {availableIngredients.map((ing) => (
                           <option key={ing.id} value={ing.id}>
                             {ing.name} (Stock: {ing.current_stock} {ing.unit_of_measure})
@@ -509,6 +525,11 @@ function RecipesPage() {
                     </div>
                   ))}
                 </div>
+                {availableIngredients.length === 0 && (
+                  <p className="mt-1 text-[11px] text-amber-400">
+                    ⚠️ No ingredients in inventory. Please add raw materials in Inventory Management first.
+                  </p>
+                )}
               </div>
             </div>
 
