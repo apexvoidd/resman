@@ -15,6 +15,7 @@ def _sanitize(v: str | None) -> str | None:
 
 class ReviewSubmitInput(BaseModel):
     """Customer submits a review for one menu item after paying."""
+
     menu_item_id: uuid.UUID
     rating: int = Field(..., ge=1, le=5)
     comment: str | None = Field(None, max_length=2000)

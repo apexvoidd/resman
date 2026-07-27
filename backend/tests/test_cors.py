@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 
@@ -18,7 +19,9 @@ def test_cors_preflight_standard_localhost(client):
         },
     )
     assert response.status_code == 200
-    assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
+    assert (
+        response.headers.get("access-control-allow-origin") == "http://localhost:3000"
+    )
     assert response.headers.get("access-control-allow-credentials") == "true"
 
 
@@ -47,7 +50,9 @@ def test_cors_preflight_127_0_0_1_origin(client):
         },
     )
     assert response.status_code == 200
-    assert response.headers.get("access-control-allow-origin") == "http://127.0.0.1:3000"
+    assert (
+        response.headers.get("access-control-allow-origin") == "http://127.0.0.1:3000"
+    )
 
 
 def test_cors_actual_request_headers(client):
@@ -56,7 +61,9 @@ def test_cors_actual_request_headers(client):
         headers={"Origin": "http://localhost:3000"},
     )
     assert response.status_code == 200
-    assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
+    assert (
+        response.headers.get("access-control-allow-origin") == "http://localhost:3000"
+    )
     assert response.headers.get("access-control-allow-credentials") == "true"
 
 
@@ -79,13 +86,16 @@ def test_cors_settings_env_var_parsing(monkeypatch):
     from app.config.settings import Settings
 
     # Test plain comma-separated string from EnvSettingsSource
-    monkeypatch.setenv("CORS_ORIGINS", "https://frontend.example.com,https://admin.example.com")
+    monkeypatch.setenv(
+        "CORS_ORIGINS", "https://frontend.example.com,https://admin.example.com"
+    )
     s1 = Settings()
-    assert s1.CORS_ORIGINS == ["https://frontend.example.com", "https://admin.example.com"]
+    assert s1.CORS_ORIGINS == [
+        "https://frontend.example.com",
+        "https://admin.example.com",
+    ]
 
     # Test JSON string array from EnvSettingsSource
     monkeypatch.setenv("CORS_ORIGINS", '["https://app.render.com"]')
     s2 = Settings()
     assert s2.CORS_ORIGINS == ["https://app.render.com"]
-
-

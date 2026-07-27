@@ -4,7 +4,6 @@ Service layer for Ingredient Inventory Management, Stock Restocking, Manual Adju
 
 import logging
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -84,6 +83,7 @@ def _build_ingredient_out(ingredient: Ingredient) -> IngredientOut:
 
 # --- CATEGORIES ---
 
+
 async def seed_default_categories(db: AsyncSession) -> None:
     """Pre-populate standard ingredient categories if table is empty."""
     res = await db.execute(select(func.count(IngredientCategory.id)))
@@ -96,7 +96,9 @@ async def seed_default_categories(db: AsyncSession) -> None:
 
 async def get_categories(db: AsyncSession) -> list[IngredientCategoryOut]:
     await seed_default_categories(db)
-    result = await db.execute(select(IngredientCategory).order_by(IngredientCategory.name.asc()))
+    result = await db.execute(
+        select(IngredientCategory).order_by(IngredientCategory.name.asc())
+    )
     categories = result.scalars().all()
     return [IngredientCategoryOut.model_validate(c) for c in categories]
 
@@ -124,11 +126,10 @@ async def create_category(
 
 # --- DASHBOARD & INGREDIENT LIST ---
 
+
 async def get_inventory_dashboard(db: AsyncSession) -> InventoryDashboardOut:
     """Compute aggregate counts for dashboard: total, low stock, out of stock, in stock, total value."""
-    result = await db.execute(
-        select(Ingredient).where(Ingredient.deleted_at.is_(None))
-    )
+    result = await db.execute(select(Ingredient).where(Ingredient.deleted_at.is_(None)))
     ingredients = result.scalars().all()
 
     total_cnt = len(ingredients)
@@ -206,7 +207,9 @@ async def get_ingredients(
     return out_list
 
 
-async def get_ingredient_by_id(db: AsyncSession, ingredient_id: uuid.UUID) -> IngredientOut:
+async def get_ingredient_by_id(
+    db: AsyncSession, ingredient_id: uuid.UUID
+) -> IngredientOut:
     result = await db.execute(
         select(Ingredient)
         .options(selectinload(Ingredient.category))
@@ -214,11 +217,14 @@ async def get_ingredient_by_id(db: AsyncSession, ingredient_id: uuid.UUID) -> In
     )
     ing = result.scalar_one_or_none()
     if not ing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found."
+        )
     return _build_ingredient_out(ing)
 
 
 # --- CRUD OPERATIONS ---
+
 
 async def create_ingredient(
     db: AsyncSession, payload: IngredientCreate, user_id: uuid.UUID | None = None
@@ -287,7 +293,9 @@ async def update_ingredient(
     )
     ing = result.scalar_one_or_none()
     if not ing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found."
+        )
 
     if payload.name and payload.name.strip().lower() != ing.name.lower():
         name_clean = payload.name.strip()
@@ -336,6 +344,7 @@ async def update_ingredient(
     )
 
     from app.services.recipe import sync_menu_availability_for_ingredient
+
     await sync_menu_availability_for_ingredient(db, ing.id)
 
     await db.commit()
@@ -343,7 +352,10 @@ async def update_ingredient(
 
 
 async def toggle_ingredient_status(
-    db: AsyncSession, ingredient_id: uuid.UUID, is_active: bool, user_id: uuid.UUID | None = None
+    db: AsyncSession,
+    ingredient_id: uuid.UUID,
+    is_active: bool,
+    user_id: uuid.UUID | None = None,
 ) -> IngredientOut:
     """Disable or enable ingredient."""
     result = await db.execute(
@@ -353,7 +365,9 @@ async def toggle_ingredient_status(
     )
     ing = result.scalar_one_or_none()
     if not ing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found."
+        )
 
     ing.is_active = is_active
     ing.version_id += 1
@@ -378,6 +392,7 @@ async def toggle_ingredient_status(
 
 # --- RESTOCKING, ADJUSTMENT & WASTE ---
 
+
 async def restock_ingredient(
     db: AsyncSession,
     ingredient_id: uuid.UUID,
@@ -394,7 +409,9 @@ async def restock_ingredient(
     )
     ing = result.scalar_one_or_none()
     if not ing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found."
+        )
 
     prev_qty = float(ing.current_stock)
     new_qty = prev_qty + payload.quantity
@@ -438,6 +455,7 @@ async def restock_ingredient(
     )
 
     from app.services.recipe import sync_menu_availability_for_ingredient
+
     await sync_menu_availability_for_ingredient(db, ing.id)
 
     await db.commit()
@@ -460,7 +478,9 @@ async def adjust_stock(
     )
     ing = result.scalar_one_or_none()
     if not ing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found."
+        )
 
     prev_qty = float(ing.current_stock)
 
@@ -509,6 +529,7 @@ async def adjust_stock(
         )
 
     from app.services.recipe import sync_menu_availability_for_ingredient
+
     await sync_menu_availability_for_ingredient(db, ing.id)
 
     await db.commit()
@@ -529,7 +550,9 @@ async def record_waste(
     )
     ing = result.scalar_one_or_none()
     if not ing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found."
+        )
 
     prev_qty = float(ing.current_stock)
     if prev_qty < payload.quantity:
@@ -568,6 +591,7 @@ async def record_waste(
     )
 
     from app.services.recipe import sync_menu_availability_for_ingredient
+
     await sync_menu_availability_for_ingredient(db, ing.id)
 
     await db.commit()
@@ -596,13 +620,17 @@ async def record_waste(
 
 # --- STOCK HISTORY & AUDIT LOGS ---
 
+
 async def get_stock_history(
     db: AsyncSession, ingredient_id: uuid.UUID | None = None, limit: int = 100
 ) -> list[StockHistoryOut]:
     """Retrieve chronological inventory stock change audit history."""
     query = (
         select(StockHistory)
-        .options(selectinload(StockHistory.ingredient), selectinload(StockHistory.recorded_by))
+        .options(
+            selectinload(StockHistory.ingredient),
+            selectinload(StockHistory.recorded_by),
+        )
         .order_by(StockHistory.created_at.desc())
         .limit(limit)
     )
@@ -616,7 +644,9 @@ async def get_stock_history(
     out_list = []
     for h in histories:
         ing_name = h.ingredient.name if h.ingredient else None
-        rec_name = h.recorded_by.name or h.recorded_by.email if h.recorded_by else "System"
+        rec_name = (
+            h.recorded_by.name or h.recorded_by.email if h.recorded_by else "System"
+        )
 
         out_list.append(
             StockHistoryOut(

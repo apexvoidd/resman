@@ -1,4 +1,5 @@
 import uuid
+
 import pytest
 from pydantic import ValidationError
 
@@ -12,8 +13,12 @@ def test_recipe_duplicate_ingredient_validation():
             menu_item_id=uuid.uuid4(),
             name="Butter Chicken",
             ingredients=[
-                RecipeIngredientInput(ingredient_id=ing_id, quantity=200, unit_of_measure="g"),
-                RecipeIngredientInput(ingredient_id=ing_id, quantity=50, unit_of_measure="g"),
+                RecipeIngredientInput(
+                    ingredient_id=ing_id, quantity=200, unit_of_measure="g"
+                ),
+                RecipeIngredientInput(
+                    ingredient_id=ing_id, quantity=50, unit_of_measure="g"
+                ),
             ],
         )
     assert "Duplicate ingredients" in str(exc_info.value)
@@ -26,6 +31,8 @@ def test_recipe_positive_quantity_validation():
             menu_item_id=uuid.uuid4(),
             name="Butter Chicken",
             ingredients=[
-                RecipeIngredientInput(ingredient_id=ing_id, quantity=-10, unit_of_measure="g"),
+                RecipeIngredientInput(
+                    ingredient_id=ing_id, quantity=-10, unit_of_measure="g"
+                ),
             ],
         )

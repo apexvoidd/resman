@@ -66,9 +66,7 @@ async def verify_arrival(
     status_code=status.HTTP_200_OK,
 )
 async def list_tables(
-    search: str | None = Query(
-        None, description="Search by table number"
-    ),
+    search: str | None = Query(None, description="Search by table number"),
     table_status: str | None = Query(
         None,
         alias="status",
@@ -179,7 +177,9 @@ async def update_table(
 async def toggle_table_status(
     table_id: uuid.UUID,
     payload: TableStatusToggle,
-    _: User = Depends(require_role(["waiter", "cashier", "kitchen_staff", "admin", "manager"])),
+    _: User = Depends(
+        require_role(["waiter", "cashier", "kitchen_staff", "admin", "manager"])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Update active state or operational status for a dining table."""
@@ -210,7 +210,9 @@ async def delete_table(
 )
 async def mark_table_clean(
     table_id: uuid.UUID,
-    current_user: User = Depends(require_role(["cleaning_staff", "waiter", "manager", "admin"])),
+    current_user: User = Depends(
+        require_role(["cleaning_staff", "waiter", "manager", "admin"])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Cleaning staff marks a table as clean, setting status back to available."""

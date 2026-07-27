@@ -2,7 +2,16 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -57,7 +66,9 @@ class Ingredient(BaseModel, SoftDeleteMixin):
         Numeric(10, 2), default=0.0, nullable=False
     )
     supplier: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False, index=True
+    )
     version_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
     # Relationships
@@ -244,4 +255,3 @@ class WasteRecord(BaseModel):
         "MenuItem", back_populates="waste_records"
     )
     recorded_by: Mapped[Optional["User"]] = relationship("User")
-

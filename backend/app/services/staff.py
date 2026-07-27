@@ -87,7 +87,11 @@ async def get_staff_list(
 
     # Apply role filter
     if role_code and role_code.strip():
-        query = query.join(User.user_roles).join(UserRole.role).where(Role.code == role_code.strip())
+        query = (
+            query.join(User.user_roles)
+            .join(UserRole.role)
+            .where(Role.code == role_code.strip())
+        )
 
     # Apply active status filter
     if is_active is not None:
@@ -172,6 +176,7 @@ async def create_staff(db: AsyncSession, payload: StaffCreate) -> StaffOut:
     if settings.CLERK_SECRET_KEY and payload.password:
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=10.0) as client:
                 c_resp = await client.post(
                     "https://api.clerk.com/v1/users",
@@ -252,7 +257,9 @@ async def update_staff(
     if payload.email and payload.email.lower() != user.email.lower():
         existing = await db.execute(
             select(User).where(
-                User.email.ilike(payload.email), User.id != staff_id, User.deleted_at.is_(None)
+                User.email.ilike(payload.email),
+                User.id != staff_id,
+                User.deleted_at.is_(None),
             )
         )
         if existing.scalar_one_or_none() is not None:
@@ -333,6 +340,7 @@ async def delete_staff(db: AsyncSession, staff_id: uuid.UUID) -> None:
     if settings.CLERK_SECRET_KEY and user.clerk_user_id:
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=10.0) as client:
                 await client.delete(
                     f"https://api.clerk.com/v1/users/{user.clerk_user_id}",

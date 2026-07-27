@@ -1,5 +1,5 @@
-import pytest
 from app.services.inventory import DEFAULT_CATEGORIES, _determine_stock_status
+
 
 def test_determine_stock_status():
     assert _determine_stock_status(0.0, 10.0) == "out_of_stock"
@@ -7,6 +7,7 @@ def test_determine_stock_status():
     assert _determine_stock_status(5.0, 10.0) == "low_stock"
     assert _determine_stock_status(10.0, 10.0) == "low_stock"
     assert _determine_stock_status(15.0, 10.0) == "in_stock"
+
 
 def test_default_categories_list():
     assert "Vegetables" in DEFAULT_CATEGORIES

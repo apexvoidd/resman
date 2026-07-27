@@ -71,9 +71,7 @@ def _build_menu_item_out(item: MenuItem) -> MenuItemOut:
 
 async def get_or_create_default_branch(db: AsyncSession) -> Branch:
     """Fetch default active branch."""
-    result = await db.execute(
-        select(Branch).where(Branch.is_active.is_(True)).limit(1)
-    )
+    result = await db.execute(select(Branch).where(Branch.is_active.is_(True)).limit(1))
     branch = result.scalar_one_or_none()
     if branch is not None:
         return branch
@@ -105,6 +103,7 @@ async def get_or_create_default_branch(db: AsyncSession) -> Branch:
 
 # --- CATEGORY SERVICES ---
 
+
 async def get_category_list(
     db: AsyncSession, *, is_active: bool | None = None
 ) -> list[CategoryOut]:
@@ -124,9 +123,7 @@ async def get_category_list(
     return [_build_category_out(c) for c in categories]
 
 
-async def create_category(
-    db: AsyncSession, payload: CategoryCreate
-) -> CategoryOut:
+async def create_category(db: AsyncSession, payload: CategoryCreate) -> CategoryOut:
     """Create a new menu category."""
     branch = await get_or_create_default_branch(db)
     slug = _slugify(payload.name)
@@ -212,6 +209,7 @@ async def toggle_category_status(
 
 
 # --- MENU ITEM SERVICES ---
+
 
 async def get_menu_item_list(
     db: AsyncSession,
@@ -308,9 +306,7 @@ async def get_menu_item_by_id(db: AsyncSession, item_id: uuid.UUID) -> MenuItemO
     return _build_menu_item_out(item)
 
 
-async def create_menu_item(
-    db: AsyncSession, payload: MenuItemCreate
-) -> MenuItemOut:
+async def create_menu_item(db: AsyncSession, payload: MenuItemCreate) -> MenuItemOut:
     """Create a new menu item."""
     branch = await get_or_create_default_branch(db)
 

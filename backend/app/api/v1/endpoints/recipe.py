@@ -29,7 +29,9 @@ router = APIRouter(tags=["Recipe Management"])
     status_code=status.HTTP_200_OK,
 )
 async def get_all_recipes(
-    _: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
+    _: User = Depends(
+        require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Retrieve all menu item recipes, required ingredients, and portion availability."""
@@ -44,7 +46,9 @@ async def get_all_recipes(
 )
 async def get_recipe_by_menu_item_id(
     menu_item_id: uuid.UUID,
-    _: User = Depends(require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])),
+    _: User = Depends(
+        require_role(["kitchen", "kitchen_staff", "chef", "manager", "admin"])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Retrieve recipe and ingredient breakdown for a specific menu item."""

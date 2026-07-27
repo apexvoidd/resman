@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -21,7 +21,7 @@ async def test_create_staff_reactivates_soft_deleted_email():
     mock_role.name = "Waiter"
     mock_role.description = "Waiter role"
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Mock soft-deleted user
     mock_user = MagicMock()

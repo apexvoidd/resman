@@ -60,7 +60,9 @@ async def list_all_reviews(
     _: User = Depends(require_role(["manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
-    return await review_service.get_all_reviews_manager(db, include_hidden=include_hidden)
+    return await review_service.get_all_reviews_manager(
+        db, include_hidden=include_hidden
+    )
 
 
 @router.post(
@@ -89,7 +91,9 @@ async def hide_review(
     current_user: User = Depends(require_role(["manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
-    return await review_service.toggle_review_visibility(db, review_id, hide=True, current_user=current_user)
+    return await review_service.toggle_review_visibility(
+        db, review_id, hide=True, current_user=current_user
+    )
 
 
 @router.patch(
@@ -103,4 +107,6 @@ async def restore_review(
     current_user: User = Depends(require_role(["manager", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
-    return await review_service.toggle_review_visibility(db, review_id, hide=False, current_user=current_user)
+    return await review_service.toggle_review_visibility(
+        db, review_id, hide=False, current_user=current_user
+    )

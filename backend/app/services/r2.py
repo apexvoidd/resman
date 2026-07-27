@@ -100,7 +100,11 @@ async def upload_file_to_supabase(file: UploadFile, folder: str = "uploads") -> 
         async with httpx.AsyncClient() as client:
             resp = await client.post(upload_url, content=data, headers=headers)
             if resp.status_code not in (200, 201):
-                logger.error("Supabase Storage upload failed [%s]: %s", resp.status_code, resp.text)
+                logger.error(
+                    "Supabase Storage upload failed [%s]: %s",
+                    resp.status_code,
+                    resp.text,
+                )
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Supabase Storage error ({resp.status_code}): {resp.text}",

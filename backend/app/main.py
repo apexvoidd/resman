@@ -7,12 +7,12 @@ from app.api.v1.api import api_router
 from app.config.settings import settings
 from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
-from app.middleware.cors import setup_cors
-from app.middleware.rate_limit import setup_rate_limiter
-from app.middleware.security_headers import SecurityHeadersMiddleware
 
 # Setup structured logging
 from app.db.session import init_db
+from app.middleware.cors import setup_cors
+from app.middleware.rate_limit import setup_rate_limiter
+from app.middleware.security_headers import SecurityHeadersMiddleware
 
 setup_logging()
 
@@ -62,7 +62,9 @@ def create_app() -> FastAPI:
 
     # Mount static files if upload directory exists
     from pathlib import Path
+
     from fastapi.staticfiles import StaticFiles
+
     upload_dir = Path(__file__).resolve().parent.parent / "uploads"
     upload_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")

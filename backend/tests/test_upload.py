@@ -1,17 +1,23 @@
+import httpx
 import pytest
 from fastapi.testclient import TestClient
-import httpx
-from app.main import app
-from app.core.dependencies import get_current_user, get_db
-from app.models.staff import User
+
 from app.config.settings import settings
+from app.core.dependencies import get_current_user, get_db
+from app.main import app
+from app.models.staff import User
+
 
 # Override dependencies for standalone unit testing without database
 def mock_user():
-    return User(id="admin_01", email="admin@test.com", is_superadmin=True, is_active=True)
+    return User(
+        id="admin_01", email="admin@test.com", is_superadmin=True, is_active=True
+    )
+
 
 async def mock_get_db():
     yield None
+
 
 app.dependency_overrides[get_current_user] = mock_user
 app.dependency_overrides[get_db] = mock_get_db
@@ -42,7 +48,10 @@ def test_upload_menu_image_success():
     assert response.status_code == 200, response.text
     data = response.json()
     assert "image_url" in data
-    assert "https://testproj.supabase.co/storage/v1/object/public/test-bucket/menu-items/" in data["image_url"]
+    assert (
+        "https://testproj.supabase.co/storage/v1/object/public/test-bucket/menu-items/"
+        in data["image_url"]
+    )
 
 
 def test_upload_logo_success(monkeypatch):
@@ -61,7 +70,10 @@ def test_upload_logo_success(monkeypatch):
     assert response.status_code == 200, response.text
     data = response.json()
     assert "logo_url" in data
-    assert "https://testproj.supabase.co/storage/v1/object/public/test-bucket/logos/" in data["logo_url"]
+    assert (
+        "https://testproj.supabase.co/storage/v1/object/public/test-bucket/logos/"
+        in data["logo_url"]
+    )
 
 
 def test_upload_invalid_file_type():

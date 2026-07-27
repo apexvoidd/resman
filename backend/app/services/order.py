@@ -5,7 +5,7 @@ and Session Order History.
 
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 from app.models.customer import GuestSession
 from app.models.menu import MenuItem
 from app.models.order import Order, OrderItem, OrderStatusHistory
-from app.models.recipe import Recipe, RecipeIngredient, Ingredient
+from app.models.recipe import Ingredient, Recipe, RecipeIngredient
 from app.models.table import DiningTable
 from app.schemas.order import (
     OrderCreate,
@@ -77,10 +77,10 @@ def _build_order_out(order: Order) -> OrderOut:
     except Exception:
         pass
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     created_at_dt = order.created_at
     if created_at_dt.tzinfo is None:
-        created_at_dt = created_at_dt.replace(tzinfo=timezone.utc)
+        created_at_dt = created_at_dt.replace(tzinfo=UTC)
 
     elapsed_sec = int((now - created_at_dt).total_seconds()) if created_at_dt else 0
 
@@ -88,7 +88,7 @@ def _build_order_out(order: Order) -> OrderOut:
     if order.estimated_completion_at:
         est_comp = order.estimated_completion_at
         if est_comp.tzinfo is None:
-            est_comp = est_comp.replace(tzinfo=timezone.utc)
+            est_comp = est_comp.replace(tzinfo=UTC)
         if now > est_comp and order.status not in ["completed", "served", "cancelled"]:
             is_delayed = True
 
@@ -130,7 +130,7 @@ async def create_customer_order(
     3. Validates item availability and positive quantities.
     4. Creates order and line items atomically.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # 1. Prerequisite Checks: Session must be active, assigned to table, and verified
     if not session.is_active or not session.table_id:
@@ -162,7 +162,10 @@ async def create_customer_order(
     # 2. Prevent Duplicate Order Submissions (Idempotency / 5-second check)
     recent_check = await db.execute(
         select(Order)
-        .options(selectinload(Order.items).selectinload(OrderItem.menu_item), selectinload(Order.table))
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.menu_item),
+            selectinload(Order.table),
+        )
         .where(
             Order.guest_session_id == session.id,
             Order.status == "pending",
@@ -172,7 +175,9 @@ async def create_customer_order(
     )
     recent_order = recent_check.scalar_one_or_none()
     if recent_order:
-        logger.info("Duplicate order submission prevented for session %s", session.session_token)
+        logger.info(
+            "Duplicate order submission prevented for session %s", session.session_token
+        )
         return _build_order_out(recent_order)
 
     # 3. Validate Menu Items, Availability & Ingredient Portion Stock
@@ -195,9 +200,7 @@ async def create_customer_order(
                 .selectinload(Recipe.recipe_ingredients)
                 .selectinload(RecipeIngredient.ingredient)
             )
-            .where(
-                MenuItem.id == item_in.menu_item_id, MenuItem.deleted_at.is_(None)
-            )
+            .where(MenuItem.id == item_in.menu_item_id, MenuItem.deleted_at.is_(None))
         )
         menu_item = menu_res.scalar_one_or_none()
         if not menu_item:
@@ -250,7 +253,11 @@ async def create_customer_order(
                         for ri in rec.recipe_ingredients:
                             if ri.ingredient_id == ing_id:
                                 single_req = float(ri.quantity)
-                                max_portions = int(cur_stock // single_req) if single_req > 0 else 0
+                                max_portions = (
+                                    int(cur_stock // single_req)
+                                    if single_req > 0
+                                    else 0
+                                )
                                 if max_portions == 0:
                                     detail_msg = f"Cannot order '{m_item.name}'. Ingredient '{ing_obj.name}' is currently out of stock."
                                 else:
@@ -309,20 +316,24 @@ async def create_customer_order(
     # Re-query order with relationships loaded
     final_res = await db.execute(
         select(Order)
-        .options(selectinload(Order.items).selectinload(OrderItem.menu_item), selectinload(Order.table))
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.menu_item),
+            selectinload(Order.table),
+        )
         .where(Order.id == new_order.id)
     )
     created_order = final_res.scalar_one()
     return _build_order_out(created_order)
 
 
-async def get_session_orders(
-    db: AsyncSession, session: GuestSession
-) -> list[OrderOut]:
+async def get_session_orders(db: AsyncSession, session: GuestSession) -> list[OrderOut]:
     """Fetch all orders placed in the current dining session."""
     result = await db.execute(
         select(Order)
-        .options(selectinload(Order.items).selectinload(OrderItem.menu_item), selectinload(Order.table))
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.menu_item),
+            selectinload(Order.table),
+        )
         .where(
             Order.guest_session_id == session.id,
             Order.deleted_at.is_(None),
@@ -347,7 +358,8 @@ async def update_customer_order(
             Order.id == order_id,
             Order.guest_session_id == session.id,
             Order.deleted_at.is_(None),
-        ).with_for_update()
+        )
+        .with_for_update()
     )
     order = result.scalar_one_or_none()
 
@@ -432,7 +444,10 @@ async def update_customer_order(
 
     final_res = await db.execute(
         select(Order)
-        .options(selectinload(Order.items).selectinload(OrderItem.menu_item), selectinload(Order.table))
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.menu_item),
+            selectinload(Order.table),
+        )
         .where(Order.id == order.id)
     )
     return _build_order_out(final_res.scalar_one())
@@ -447,12 +462,16 @@ async def cancel_customer_order(
     """
     result = await db.execute(
         select(Order)
-        .options(selectinload(Order.items).selectinload(OrderItem.menu_item), selectinload(Order.table))
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.menu_item),
+            selectinload(Order.table),
+        )
         .where(
             Order.id == order_id,
             Order.guest_session_id == session.id,
             Order.deleted_at.is_(None),
-        ).with_for_update()
+        )
+        .with_for_update()
     )
     order = result.scalar_one_or_none()
 

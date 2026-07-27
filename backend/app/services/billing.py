@@ -5,14 +5,14 @@ Split Bill logic, Invoice HTML generation, and Resend Email delivery.
 
 import hashlib
 import hmac
-import logging
-import uuid
-from datetime import datetime, timezone
 import json
-import urllib.request
+import logging
 import urllib.error
-import httpx
+import urllib.request
+import uuid
+from datetime import UTC, datetime
 
+import httpx
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +20,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config.settings import settings
 from app.models.audit import AuditLog
-from app.models.billing import Bill, BillItem, Invoice, Payment
+from app.models.billing import Bill, BillItem, Payment
 from app.models.customer import GuestSession
 from app.models.notification import Notification
 from app.models.order import Order, OrderItem
@@ -47,13 +47,15 @@ def _ensure_utc(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
 async def _get_restaurant_settings(db: AsyncSession) -> RestaurantSettings:
     """Fetch restaurant settings for tax and service charge percentages."""
-    res = await db.execute(select(Restaurant).where(Restaurant.is_active.is_(True)).limit(1))
+    res = await db.execute(
+        select(Restaurant).where(Restaurant.is_active.is_(True)).limit(1)
+    )
     restaurant = res.scalar_one_or_none()
     if not restaurant:
         res_any = await db.execute(select(Restaurant).limit(1))
@@ -61,7 +63,9 @@ async def _get_restaurant_settings(db: AsyncSession) -> RestaurantSettings:
 
     if restaurant:
         sett_res = await db.execute(
-            select(RestaurantSettings).where(RestaurantSettings.restaurant_id == restaurant.id)
+            select(RestaurantSettings).where(
+                RestaurantSettings.restaurant_id == restaurant.id
+            )
         )
         s = sett_res.scalar_one_or_none()
         if s:
@@ -76,11 +80,14 @@ async def _get_restaurant_settings(db: AsyncSession) -> RestaurantSettings:
 
 async def request_bill(db: AsyncSession, session_token: str) -> dict[str, str]:
     """Customer requests bill at their table."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     sess_res = await db.execute(
         select(GuestSession)
         .options(selectinload(GuestSession.table))
-        .where(GuestSession.session_token == session_token, GuestSession.is_active.is_(True))
+        .where(
+            GuestSession.session_token == session_token,
+            GuestSession.is_active.is_(True),
+        )
     )
     session = sess_res.scalar_one_or_none()
     if not session:
@@ -97,7 +104,11 @@ async def request_bill(db: AsyncSession, session_token: str) -> dict[str, str]:
         )
     )
     all_orders = orders_res.scalars().all()
-    active_orders = [o for o in all_orders if o.status not in ("completed", "ready", "served", "cancelled")]
+    active_orders = [
+        o
+        for o in all_orders
+        if o.status not in ("completed", "ready", "served", "cancelled")
+    ]
     if active_orders:
         pending_statuses = ", ".join(set(o.status for o in active_orders))
         raise HTTPException(
@@ -126,7 +137,9 @@ async def request_bill(db: AsyncSession, session_token: str) -> dict[str, str]:
     )
 
     await db.commit()
-    return {"message": f"Bill requested for Table {table_num}. Your waiter will arrive shortly."}
+    return {
+        "message": f"Bill requested for Table {table_num}. Your waiter will arrive shortly."
+    }
 
 
 async def generate_bill(
@@ -136,7 +149,7 @@ async def generate_bill(
     Waiter generates a consolidated bill for ALL orders in a dining session.
     LOCKS the dining session to prevent new orders.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # 1. Fetch the anchor order to get session context
     order_res = await db.execute(
@@ -247,7 +260,9 @@ async def generate_bill(
     discount = round(payload.discount_amount, 2)
     tip = round(payload.tip_amount, 2)
 
-    grand_total = round(subtotal + tax_amount + service_charge_amount - discount + tip, 2)
+    grand_total = round(
+        subtotal + tax_amount + service_charge_amount - discount + tip, 2
+    )
     grand_total = max(0.0, grand_total)
 
     if existing_bill:
@@ -313,13 +328,23 @@ async def generate_bill(
     return _build_bill_out(bill, order, settings_obj)
 
 
-def _build_bill_out(bill: Bill, order: Order | None, settings_obj: RestaurantSettings) -> BillOut:
+def _build_bill_out(
+    bill: Bill, order: Order | None, settings_obj: RestaurantSettings
+) -> BillOut:
     table_num = order.table.table_number if order and order.table else None
-    guest_name = order.guest_session.guest_name if order and order.guest_session else None
-    guest_email = order.guest_session.guest_email if order and order.guest_session else None
+    guest_name = (
+        order.guest_session.guest_name if order and order.guest_session else None
+    )
+    guest_email = (
+        order.guest_session.guest_email if order and order.guest_session else None
+    )
     session_id = order.guest_session.id if order and order.guest_session else None
     is_locked = order.guest_session.is_locked if order and order.guest_session else True
-    can_review = order.guest_session.can_submit_review if order and order.guest_session else False
+    can_review = (
+        order.guest_session.can_submit_review
+        if order and order.guest_session
+        else False
+    )
 
     subtotal = float(bill.subtotal)
     tax_pct = float(settings_obj.tax_percentage or 0.0)
@@ -377,13 +402,17 @@ async def get_bill_by_id(db: AsyncSession, bill_id: uuid.UUID) -> BillOut:
     )
     bill = b_res.scalar_one_or_none()
     if not bill:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found."
+        )
 
     settings_obj = await _get_restaurant_settings(db)
     return _build_bill_out(bill, bill.order, settings_obj)
 
 
-async def get_bill_by_session_token(db: AsyncSession, session_token: str) -> BillOut | None:
+async def get_bill_by_session_token(
+    db: AsyncSession, session_token: str
+) -> BillOut | None:
     """Fetch active bill for customer dining session."""
     sess_res = await db.execute(
         select(GuestSession).where(GuestSession.session_token == session_token)
@@ -393,7 +422,9 @@ async def get_bill_by_session_token(db: AsyncSession, session_token: str) -> Bil
         return None
 
     order_res = await db.execute(
-        select(Order).where(Order.guest_session_id == session.id, Order.deleted_at.is_(None))
+        select(Order).where(
+            Order.guest_session_id == session.id, Order.deleted_at.is_(None)
+        )
     )
     orders = order_res.scalars().all()
     if not orders:
@@ -445,13 +476,15 @@ async def mark_notification_read(
     db: AsyncSession, notification_id: uuid.UUID
 ) -> dict[str, str]:
     """Mark a single waiter notification as read (dismiss)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     res = await db.execute(
         select(Notification).where(Notification.id == notification_id)
     )
     notif = res.scalar_one_or_none()
     if not notif:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found."
+        )
     notif.status = "read"
     notif.read_at = now
     await db.commit()
@@ -460,7 +493,7 @@ async def mark_notification_read(
 
 async def clear_all_waiter_notifications(db: AsyncSession) -> dict[str, str]:
     """Mark all unread waiter notifications as read (clear all)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     res = await db.execute(
         select(Notification).where(
             Notification.recipient_type == "waiter",
@@ -479,10 +512,14 @@ async def unlock_session(
     db: AsyncSession, session_id: uuid.UUID, manager_user: User
 ) -> dict[str, str]:
     """Manager unlocks dining session to allow additional orders."""
-    sess_res = await db.execute(select(GuestSession).where(GuestSession.id == session_id))
+    sess_res = await db.execute(
+        select(GuestSession).where(GuestSession.id == session_id)
+    )
     session = sess_res.scalar_one_or_none()
     if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found."
+        )
 
     session.is_locked = False
 
@@ -499,7 +536,9 @@ async def unlock_session(
     return {"message": "Dining session unlocked. New orders can now be placed."}
 
 
-async def calculate_split_bill(db: AsyncSession, payload: SplitBillInput) -> SplitBillOut:
+async def calculate_split_bill(
+    db: AsyncSession, payload: SplitBillInput
+) -> SplitBillOut:
     """Calculate split bill amounts (equal, itemized, or custom)."""
     b_res = await db.execute(
         select(Bill)
@@ -508,7 +547,9 @@ async def calculate_split_bill(db: AsyncSession, payload: SplitBillInput) -> Spl
     )
     bill = b_res.scalar_one_or_none()
     if not bill:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found."
+        )
 
     grand_total = float(bill.total_amount)
 
@@ -563,7 +604,9 @@ async def create_razorpay_order(
     b_res = await db.execute(select(Bill).where(Bill.id == payload.bill_id))
     bill = b_res.scalar_one_or_none()
     if not bill:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found."
+        )
 
     if bill.status == "paid":
         raise HTTPException(
@@ -663,7 +706,7 @@ async def verify_razorpay_payment(
     Verify Razorpay payment HMAC SHA256 signature on backend.
     Never trust frontend payment status.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     key_secret = settings.RAZORPAY_KEY_SECRET or "rzp_test_dev_secret"
 
     # Verify signature
@@ -679,7 +722,9 @@ async def verify_razorpay_payment(
         or settings.APP_ENV == "development"
         or not settings.RAZORPAY_KEY_SECRET
     )
-    if not is_mock and not hmac.compare_digest(generated_sig, payload.razorpay_signature):
+    if not is_mock and not hmac.compare_digest(
+        generated_sig, payload.razorpay_signature
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid Razorpay payment signature. Payment verification failed.",
@@ -705,7 +750,9 @@ async def verify_razorpay_payment(
     )
     bill = b_res.scalar_one_or_none()
     if not bill:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found."
+        )
 
     paid_amt = payload.amount if payload.amount else float(bill.total_amount)
 
@@ -734,7 +781,9 @@ async def verify_razorpay_payment(
     existing_paid_sum = sum(
         float(p.amount)
         for p in (bill.payments or [])
-        if p.status == "completed" and p != payment and getattr(p, "id", None) != getattr(payment, "id", None)
+        if p.status == "completed"
+        and p != payment
+        and getattr(p, "id", None) != getattr(payment, "id", None)
     )
     all_paid_sum = existing_paid_sum + paid_amt
 
@@ -778,7 +827,7 @@ async def confirm_cash_payment(
     db: AsyncSession, payload: CashPaymentInput, cashier_user: User
 ) -> PaymentOut:
     """Cashier confirms cash payment."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     b_res = await db.execute(
         select(Bill)
         .options(
@@ -790,7 +839,9 @@ async def confirm_cash_payment(
     )
     bill = b_res.scalar_one_or_none()
     if not bill:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found."
+        )
 
     if bill.status == "paid":
         raise HTTPException(
@@ -815,7 +866,9 @@ async def confirm_cash_payment(
     existing_paid_sum = sum(
         float(p.amount)
         for p in (bill.payments or [])
-        if p.status == "completed" and p != payment and getattr(p, "id", None) != getattr(payment, "id", None)
+        if p.status == "completed"
+        and p != payment
+        and getattr(p, "id", None) != getattr(payment, "id", None)
     )
     all_paid_sum = existing_paid_sum + float(payload.amount)
 
@@ -856,7 +909,9 @@ async def confirm_cash_payment(
     )
 
 
-async def request_cash_settlement(db: AsyncSession, bill_id: uuid.UUID) -> dict[str, str]:
+async def request_cash_settlement(
+    db: AsyncSession, bill_id: uuid.UUID
+) -> dict[str, str]:
     """Customer requests cash settlement for their bill."""
     b_res = await db.execute(
         select(Bill)
@@ -868,12 +923,20 @@ async def request_cash_settlement(db: AsyncSession, bill_id: uuid.UUID) -> dict[
     )
     bill = b_res.scalar_one_or_none()
     if not bill:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found."
+        )
 
-    table_num = bill.order.table.table_number if (bill.order and bill.order.table) else "N/A"
+    table_num = (
+        bill.order.table.table_number if (bill.order and bill.order.table) else "N/A"
+    )
     guest_name = (
         bill.order.guest_session.guest_name
-        if (bill.order and bill.order.guest_session and bill.order.guest_session.guest_name)
+        if (
+            bill.order
+            and bill.order.guest_session
+            and bill.order.guest_session.guest_name
+        )
         else "Guest"
     )
 
@@ -884,7 +947,11 @@ async def request_cash_settlement(db: AsyncSession, bill_id: uuid.UUID) -> dict[
             message=f"{guest_name} at Table {table_num} requested to pay ₹{float(bill.total_amount):.2f} in cash for Bill #{bill.bill_number}.",
             notification_type="cash_settlement_requested",
             status="unread",
-            payload_json={"bill_id": str(bill.id), "table_number": table_num, "amount": float(bill.total_amount)},
+            payload_json={
+                "bill_id": str(bill.id),
+                "table_number": table_num,
+                "amount": float(bill.total_amount),
+            },
         )
     )
     db.add(
@@ -894,7 +961,11 @@ async def request_cash_settlement(db: AsyncSession, bill_id: uuid.UUID) -> dict[
             message=f"{guest_name} at Table {table_num} requested to pay ₹{float(bill.total_amount):.2f} in cash for Bill #{bill.bill_number}.",
             notification_type="cash_settlement_requested",
             status="unread",
-            payload_json={"bill_id": str(bill.id), "table_number": table_num, "amount": float(bill.total_amount)},
+            payload_json={
+                "bill_id": str(bill.id),
+                "table_number": table_num,
+                "amount": float(bill.total_amount),
+            },
         )
     )
     await db.commit()
@@ -964,11 +1035,12 @@ async def send_invoice_email(bill: Bill, to_email: str) -> None:
         return
 
     try:
-        data = json.dumps({
-            "from": "Smart Restaurant <invoices@resman.app>",
-            "to": [to_email],
-            "subject": f"Tax Invoice - {bill.bill_number}",
-            "html": f"""
+        data = json.dumps(
+            {
+                "from": "Smart Restaurant <invoices@resman.app>",
+                "to": [to_email],
+                "subject": f"Tax Invoice - {bill.bill_number}",
+                "html": f"""
             <div style="font-family: sans-serif; padding: 20px; color: #333;">
               <h2>Thank you for dining with us!</h2>
               <p>Here is your tax invoice summary:</p>
@@ -980,7 +1052,8 @@ async def send_invoice_email(bill: Bill, to_email: str) -> None:
               <p>We look forward to serving you again!</p>
             </div>
             """,
-        }).encode("utf-8")
+            }
+        ).encode("utf-8")
         req = urllib.request.Request(
             "https://api.resend.com/emails",
             data=data,
@@ -991,24 +1064,23 @@ async def send_invoice_email(bill: Bill, to_email: str) -> None:
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=10) as resp:
-            logger.info("Sent Resend invoice email to %s: status %s", to_email, resp.status)
+            logger.info(
+                "Sent Resend invoice email to %s: status %s", to_email, resp.status
+            )
     except Exception as exc:
         logger.warning("Failed to send Resend invoice email: %s", exc)
 
 
 def generate_invoice_html(bill: BillOut) -> str:
     """Generate printable HTML Tax Invoice."""
-    items_html = "".join(
-        f"""
+    items_html = "".join(f"""
         <tr>
           <td style="padding: 8px; border-bottom: 1px solid #ddd;">{item.item_name}</td>
           <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">{item.quantity}</td>
           <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">₹{item.unit_price:.2f}</td>
           <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">₹{item.total_price:.2f}</td>
         </tr>
-        """
-        for item in bill.items
-    )
+        """ for item in bill.items)
 
     return f"""
     <!DOCTYPE html>
@@ -1094,4 +1166,3 @@ async def get_all_bills(
     res = await db.execute(stmt)
     bills = res.scalars().all()
     return [_build_bill_out(b, b.order, settings_obj) for b in bills]
-

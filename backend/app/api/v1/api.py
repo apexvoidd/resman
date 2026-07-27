@@ -53,19 +53,17 @@ api_router.include_router(inventory.router)
 
 # Recipe Management Endpoints (Dual Mount for /recipes and /recipe)
 api_router.include_router(recipe.router, prefix="/recipes", tags=["Recipe Management"])
-api_router.include_router(recipe.router, prefix="/recipe", tags=["Recipe Management (Alias)"])
+api_router.include_router(
+    recipe.router, prefix="/recipe", tags=["Recipe Management (Alias)"]
+)
 
 # Manager Hub & Analytics Endpoints
 api_router.include_router(manager.router)
 
 # Billing & Payments Endpoints
-api_router.include_router(billing.router, prefix="/billing", tags=["Billing & Payments"])
+api_router.include_router(
+    billing.router, prefix="/billing", tags=["Billing & Payments"]
+)
 
 # Customer Reviews Endpoints
 api_router.include_router(review.router)
-
-
-
-
-
-

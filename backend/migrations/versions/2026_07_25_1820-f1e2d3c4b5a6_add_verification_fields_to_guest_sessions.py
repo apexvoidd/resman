@@ -52,9 +52,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_guest_sessions_verification_status", table_name="guest_sessions"
-    )
+    op.drop_index("ix_guest_sessions_verification_status", table_name="guest_sessions")
     op.drop_column("guest_sessions", "occupied_at")
     op.drop_column("guest_sessions", "rejection_reason")
     op.drop_column("guest_sessions", "verification_requested_at")

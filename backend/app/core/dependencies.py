@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config.settings import settings
 from app.core.security import verify_clerk_token
 from app.db.session import get_db
 from app.models.staff import Permission, Role, User, UserRole
@@ -33,8 +34,6 @@ logger = logging.getLogger("app.dependencies")
 
 _bearer = HTTPBearer(auto_error=False)
 
-
-from app.config.settings import settings
 
 async def _extract_claims(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
@@ -101,9 +100,10 @@ async def get_current_user_with_roles(
         select(User)
         .where(User.id == user.id)
         .options(
-            selectinload(User.user_roles).selectinload(UserRole.role).selectinload(
-                Role.role_permissions
-            ).selectinload(Role.role_permissions)  # type: ignore[arg-type]
+            selectinload(User.user_roles)
+            .selectinload(UserRole.role)
+            .selectinload(Role.role_permissions)
+            .selectinload(Role.role_permissions)  # type: ignore[arg-type]
         )
     )
     return result.scalar_one()

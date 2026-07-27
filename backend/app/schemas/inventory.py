@@ -8,8 +8,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # --- CATEGORY SCHEMAS ---
+
 
 class IngredientCategoryCreate(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=100)]
@@ -27,13 +27,22 @@ class IngredientCategoryOut(BaseModel):
 
 # --- INGREDIENT SCHEMAS ---
 
+
 class IngredientCreate(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=255)]
     category_id: uuid.UUID | None = None
-    unit_of_measure: Literal["kg", "g", "L", "ml", "pcs"] = Field(..., description="Unit of measurement")
-    current_stock: float = Field(default=0.0, ge=0.0, description="Initial stock quantity")
-    minimum_stock: float = Field(default=0.0, ge=0.0, description="Minimum stock threshold for low stock alert")
-    reorder_level: float = Field(default=0.0, ge=0.0, description="Reorder level quantity")
+    unit_of_measure: Literal["kg", "g", "L", "ml", "pcs"] = Field(
+        ..., description="Unit of measurement"
+    )
+    current_stock: float = Field(
+        default=0.0, ge=0.0, description="Initial stock quantity"
+    )
+    minimum_stock: float = Field(
+        default=0.0, ge=0.0, description="Minimum stock threshold for low stock alert"
+    )
+    reorder_level: float = Field(
+        default=0.0, ge=0.0, description="Reorder level quantity"
+    )
     unit_cost: float = Field(default=0.0, ge=0.0, description="Cost per unit")
     supplier: Annotated[str | None, Field(max_length=255)] = None
     is_active: bool = True
@@ -72,8 +81,11 @@ class IngredientOut(BaseModel):
 
 # --- RESTOCK, ADJUSTMENT, WASTE SCHEMAS ---
 
+
 class RestockInput(BaseModel):
-    quantity: float = Field(..., gt=0.0, description="Restock quantity must be positive")
+    quantity: float = Field(
+        ..., gt=0.0, description="Restock quantity must be positive"
+    )
     purchase_price: float = Field(..., ge=0.0, description="Purchase cost per unit")
     supplier: Annotated[str | None, Field(max_length=255)] = None
     invoice_number: Annotated[str | None, Field(max_length=100)] = None
@@ -82,7 +94,9 @@ class RestockInput(BaseModel):
 
 class ManualAdjustmentInput(BaseModel):
     adjustment_type: Literal["increase", "decrease"]
-    quantity: float = Field(..., gt=0.0, description="Adjustment quantity must be positive")
+    quantity: float = Field(
+        ..., gt=0.0, description="Adjustment quantity must be positive"
+    )
     reason: Literal[
         "Stock Count Correction",
         "Damage",
@@ -100,6 +114,7 @@ class WasteRecordInput(BaseModel):
 
 
 # --- AUDIT LOG & DASHBOARD SCHEMAS ---
+
 
 class StockHistoryOut(BaseModel):
     id: uuid.UUID

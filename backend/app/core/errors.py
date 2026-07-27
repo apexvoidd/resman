@@ -86,4 +86,3 @@ def register_error_handlers(app: FastAPI) -> None:
             },
         )
         return _add_cors_headers(request, response)
-

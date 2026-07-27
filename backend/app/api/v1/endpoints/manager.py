@@ -1,6 +1,6 @@
 """Manager Dashboard endpoints."""
 
-from typing import Any, List
+from typing import Any
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +32,7 @@ async def get_manager_overview(
 
 @router.get(
     "/recipe-profitability",
-    response_model=List[RecipeProfitabilityItem],
+    response_model=list[RecipeProfitabilityItem],
     status_code=status.HTTP_200_OK,
 )
 async def get_recipe_profitability(

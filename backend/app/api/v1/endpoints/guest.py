@@ -87,4 +87,3 @@ async def check_status(
     """
     session = await get_or_create_guest_session(db, session_token=x_session_token)
     return await get_guest_session_status(db, session)
-

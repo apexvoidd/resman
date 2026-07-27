@@ -2,7 +2,7 @@
 Manager Service for Executive Dashboard, Recipe Profitability, and Emergency Overrides.
 """
 
-from datetime import datetime, time, timezone
+from datetime import UTC, datetime, time
 from typing import Any
 
 from sqlalchemy import func, select, update
@@ -20,8 +20,8 @@ from app.models.table import DiningTable
 
 async def get_manager_overview(db: AsyncSession) -> dict[str, Any]:
     """Real-time operational and financial metrics."""
-    now = datetime.now(timezone.utc)
-    today_start = datetime.combine(now.date(), time.min, tzinfo=timezone.utc)
+    now = datetime.now(UTC)
+    today_start = datetime.combine(now.date(), time.min, tzinfo=UTC)
 
     rev_res = await db.execute(
         select(func.coalesce(func.sum(Bill.total_amount), 0.0)).where(
@@ -67,7 +67,9 @@ async def get_manager_overview(db: AsyncSession) -> dict[str, Any]:
         )
     )
     occupied_tables = int(occupied_res.scalar() or 0)
-    occupancy_rate = round((occupied_tables / total_tables * 100), 1) if total_tables > 0 else 0.0
+    occupancy_rate = (
+        round((occupied_tables / total_tables * 100), 1) if total_tables > 0 else 0.0
+    )
 
     low_stock_res = await db.execute(
         select(func.count(Ingredient.id)).where(
@@ -135,7 +137,9 @@ async def get_recipe_profitability_analysis(db: AsyncSession) -> list[dict[str, 
     res = await db.execute(
         select(Recipe).options(
             selectinload(Recipe.menu_item),
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
+            selectinload(Recipe.recipe_ingredients).selectinload(
+                RecipeIngredient.ingredient
+            ),
         )
     )
     recipes = res.scalars().all()
@@ -143,7 +147,9 @@ async def get_recipe_profitability_analysis(db: AsyncSession) -> list[dict[str, 
     analysis = []
     for r in recipes:
         menu_item = r.menu_item
-        selling_price = float(menu_item.price) if menu_item and menu_item.price is not None else 0.0
+        selling_price = (
+            float(menu_item.price) if menu_item and menu_item.price is not None else 0.0
+        )
 
         total_recipe_cost = 0.0
         ingredient_breakdown = []
@@ -161,33 +167,43 @@ async def get_recipe_profitability_analysis(db: AsyncSession) -> list[dict[str, 
                 if qty > 0:
                     portion_limits.append(int(current_stock_val // qty))
 
-                ingredient_breakdown.append({
-                    "ingredient_name": ing.name,
-                    "quantity": qty,
-                    "unit": ri.unit_of_measure or ing.unit_of_measure or "",
-                    "unit_cost": unit_cost,
-                    "total_cost": round(cost, 2),
-                    "current_stock": current_stock_val,
-                })
+                ingredient_breakdown.append(
+                    {
+                        "ingredient_name": ing.name,
+                        "quantity": qty,
+                        "unit": ri.unit_of_measure or ing.unit_of_measure or "",
+                        "unit_cost": unit_cost,
+                        "total_cost": round(cost, 2),
+                        "current_stock": current_stock_val,
+                    }
+                )
 
         gross_profit = selling_price - total_recipe_cost
-        margin_percent = (gross_profit / selling_price * 100) if selling_price > 0 else 0.0
+        margin_percent = (
+            (gross_profit / selling_price * 100) if selling_price > 0 else 0.0
+        )
         max_makeable = min(portion_limits) if portion_limits else 0
-        suggested_price = round(total_recipe_cost / 0.30, 2) if total_recipe_cost > 0 else selling_price
+        suggested_price = (
+            round(total_recipe_cost / 0.30, 2)
+            if total_recipe_cost > 0
+            else selling_price
+        )
 
-        analysis.append({
-            "recipe_id": str(r.id),
-            "menu_item_id": str(r.menu_item_id) if r.menu_item_id else "",
-            "menu_item_name": menu_item.name if menu_item else r.name,
-            "selling_price": selling_price,
-            "recipe_cost": round(total_recipe_cost, 2),
-            "gross_profit": round(gross_profit, 2),
-            "margin_percent": round(margin_percent, 1),
-            "max_makeable_portions": max_makeable,
-            "suggested_price_for_70pct_margin": suggested_price,
-            "ingredient_breakdown": ingredient_breakdown,
-            "is_available": menu_item.is_available if menu_item else True,
-        })
+        analysis.append(
+            {
+                "recipe_id": str(r.id),
+                "menu_item_id": str(r.menu_item_id) if r.menu_item_id else "",
+                "menu_item_name": menu_item.name if menu_item else r.name,
+                "selling_price": selling_price,
+                "recipe_cost": round(total_recipe_cost, 2),
+                "gross_profit": round(gross_profit, 2),
+                "margin_percent": round(margin_percent, 1),
+                "max_makeable_portions": max_makeable,
+                "suggested_price_for_70pct_margin": suggested_price,
+                "ingredient_breakdown": ingredient_breakdown,
+                "is_available": menu_item.is_available if menu_item else True,
+            }
+        )
 
     return sorted(analysis, key=lambda x: x["margin_percent"])
 

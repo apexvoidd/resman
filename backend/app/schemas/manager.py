@@ -1,6 +1,7 @@
 """Pydantic schemas for Manager endpoints."""
 
-from typing import Any, Dict, List
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -21,7 +22,7 @@ class ManagerOverviewResponse(BaseModel):
     low_stock_count: int
     today_waste_cost: float
     avg_csat: float
-    top_selling_items: List[TopSellingItem]
+    top_selling_items: list[TopSellingItem]
 
 
 class RecipeProfitabilityItem(BaseModel):
@@ -34,7 +35,7 @@ class RecipeProfitabilityItem(BaseModel):
     margin_percent: float
     max_makeable_portions: int
     suggested_price_for_70pct_margin: float
-    ingredient_breakdown: List[Dict[str, Any]]
+    ingredient_breakdown: list[dict[str, Any]]
     is_available: bool
 
 

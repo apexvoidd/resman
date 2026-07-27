@@ -16,10 +16,16 @@ class Settings(BaseSettings):
     PORT: int = 8000
     PUBLIC_BASE_URL: str = ""
 
-
     # Security
     SECRET_KEY: str = "default-insecure-secret-key-change-in-production"
-    ALLOWED_HOSTS: str | list[str] = ["localhost", "127.0.0.1", "0.0.0.0", "test", "testserver", "*"]
+    ALLOWED_HOSTS: str | list[str] = [
+        "localhost",
+        "127.0.0.1",
+        "0.0.0.0",
+        "test",
+        "testserver",
+        "*",
+    ]
     CORS_ORIGINS: str | list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # Database
@@ -57,7 +63,9 @@ class Settings(BaseSettings):
     # Clerk Authentication
     CLERK_SECRET_KEY: str = ""  # sk_test_xxx
     CLERK_PUBLISHABLE_KEY: str = ""  # pk_test_xxx
-    CLERK_JWKS_URL: str = ""  # e.g. https://xxx.clerk.accounts.dev/.well-known/jwks.json
+    CLERK_JWKS_URL: str = (
+        ""  # e.g. https://xxx.clerk.accounts.dev/.well-known/jwks.json
+    )
     CLERK_ISSUER: str = ""  # e.g. https://xxx.clerk.accounts.dev
 
     # Logging (Better Stack / Structured)
@@ -71,10 +79,13 @@ class Settings(BaseSettings):
             v_trimmed = v.strip()
             if v_trimmed.startswith("[") and v_trimmed.endswith("]"):
                 import json
+
                 try:
                     parsed = json.loads(v_trimmed)
                     if isinstance(parsed, list):
-                        return [str(i).strip().rstrip("/") for i in parsed if str(i).strip()]
+                        return [
+                            str(i).strip().rstrip("/") for i in parsed if str(i).strip()
+                        ]
                 except Exception:
                     pass
                 # Fallback stripping brackets

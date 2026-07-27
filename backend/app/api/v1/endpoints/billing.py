@@ -12,11 +12,11 @@ API Endpoints for Billing & Payments:
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user, require_role
+from app.core.dependencies import require_role
 from app.db.session import get_db
 from app.models.staff import User
 from app.schemas.billing import (
@@ -61,7 +61,9 @@ async def request_bill(
 )
 async def generate_bill(
     payload: BillGenerateInput,
-    current_user: User = Depends(require_role(["waiter", "cashier", "manager", "admin"])),
+    current_user: User = Depends(
+        require_role(["waiter", "cashier", "manager", "admin"])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Waiter generates itemized bill and locks the session from new orders."""
@@ -76,7 +78,9 @@ async def generate_bill(
 )
 async def list_all_bills(
     status_filter: str | None = None,
-    current_user: User = Depends(require_role(["cashier", "waiter", "manager", "admin"])),
+    current_user: User = Depends(
+        require_role(["cashier", "waiter", "manager", "admin"])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Cashier/Manager lists all bills with optional status filter."""
@@ -119,7 +123,9 @@ async def get_session_bill(
     status_code=status.HTTP_200_OK,
 )
 async def get_waiter_notifications(
-    current_user: User = Depends(require_role(["waiter", "cashier", "manager", "admin"])),
+    current_user: User = Depends(
+        require_role(["waiter", "cashier", "manager", "admin"])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Waiter fetches unread real-time notifications and bill requests."""
@@ -132,7 +138,9 @@ async def get_waiter_notifications(
     status_code=status.HTTP_200_OK,
 )
 async def clear_waiter_notifications(
-    current_user: User = Depends(require_role(["waiter", "cashier", "manager", "admin"])),
+    current_user: User = Depends(
+        require_role(["waiter", "cashier", "manager", "admin"])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Mark all unread waiter notifications as read."""
@@ -146,7 +154,9 @@ async def clear_waiter_notifications(
 )
 async def dismiss_notification(
     notification_id: uuid.UUID,
-    current_user: User = Depends(require_role(["waiter", "cashier", "manager", "admin"])),
+    current_user: User = Depends(
+        require_role(["waiter", "cashier", "manager", "admin"])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Mark a single notification as read (dismiss it)."""
@@ -220,7 +230,9 @@ async def verify_razorpay_payment(
 )
 async def confirm_cash_payment(
     payload: CashPaymentInput,
-    current_user: User = Depends(require_role(["cashier", "waiter", "manager", "admin"])),
+    current_user: User = Depends(
+        require_role(["cashier", "waiter", "manager", "admin"])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Cashier records completed cash payment and settlement."""

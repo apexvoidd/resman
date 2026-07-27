@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.audit import AuditLog
-from app.models.billing import Bill
 from app.models.customer import GuestSession
 from app.models.menu import MenuItem
 from app.models.notification import Notification
@@ -59,7 +58,9 @@ async def submit_review(
     )
     session = sess_res.scalar_one_or_none()
     if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found."
+        )
 
     if not session.can_submit_review:
         # Check if session has any non-cancelled orders
@@ -80,11 +81,15 @@ async def submit_review(
 
     # 2. Check menu item exists
     item_res = await db.execute(
-        select(MenuItem).where(MenuItem.id == payload.menu_item_id, MenuItem.deleted_at.is_(None))
+        select(MenuItem).where(
+            MenuItem.id == payload.menu_item_id, MenuItem.deleted_at.is_(None)
+        )
     )
     menu_item = item_res.scalar_one_or_none()
     if not menu_item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Menu item not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Menu item not found."
+        )
 
     # 3. Verify the item was actually ordered in this session (or at session table)
     ordered_res = await db.execute(
@@ -139,7 +144,9 @@ async def submit_review(
     branch = None
     if session.branch_id:
         branch_res = await db.execute(
-            select(Branch).where(Branch.id == session.branch_id, Branch.deleted_at.is_(None))
+            select(Branch).where(
+                Branch.id == session.branch_id, Branch.deleted_at.is_(None)
+            )
         )
         branch = branch_res.scalar_one_or_none()
     if not branch:
@@ -148,7 +155,9 @@ async def submit_review(
         )
         branch = branch_res.scalar_one_or_none()
     if not branch:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Branch not found.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Branch not found."
+        )
 
     # 6. Create review
     review = Review(
@@ -165,27 +174,39 @@ async def submit_review(
     await db.flush()
 
     # 7. Notify manager
-    db.add(Notification(
-        recipient_type="manager",
-        title=f"⭐ New Review: {menu_item.name}",
-        message=f"{payload.display_name or 'Anonymous'} rated '{menu_item.name}' {payload.rating}/5 stars.",
-        notification_type="new_review",
-        status="unread",
-        payload_json={"review_id": str(review.id), "menu_item_id": str(menu_item.id)},
-    ))
+    db.add(
+        Notification(
+            recipient_type="manager",
+            title=f"⭐ New Review: {menu_item.name}",
+            message=f"{payload.display_name or 'Anonymous'} rated '{menu_item.name}' {payload.rating}/5 stars.",
+            notification_type="new_review",
+            status="unread",
+            payload_json={
+                "review_id": str(review.id),
+                "menu_item_id": str(menu_item.id),
+            },
+        )
+    )
 
     # 8. Audit log
-    db.add(AuditLog(
-        action="SUBMIT_REVIEW",
-        entity="Review",
-        entity_id=review.id,
-        new_value={"rating": payload.rating, "menu_item_id": str(payload.menu_item_id)},
-    ))
+    db.add(
+        AuditLog(
+            action="SUBMIT_REVIEW",
+            entity="Review",
+            entity_id=review.id,
+            new_value={
+                "rating": payload.rating,
+                "menu_item_id": str(payload.menu_item_id),
+            },
+        )
+    )
 
     await db.commit()
 
     final_res = await db.execute(
-        select(Review).options(selectinload(Review.menu_item)).where(Review.id == review.id)
+        select(Review)
+        .options(selectinload(Review.menu_item))
+        .where(Review.id == review.id)
     )
     return _build_review_out(final_res.scalar_one())
 
@@ -231,7 +252,11 @@ async def get_all_reviews_manager(
     include_hidden: bool = True,
 ) -> list[ReviewOut]:
     """Manager view: all reviews, optionally including hidden ones."""
-    q = select(Review).options(selectinload(Review.menu_item)).where(Review.deleted_at.is_(None))
+    q = (
+        select(Review)
+        .options(selectinload(Review.menu_item))
+        .where(Review.deleted_at.is_(None))
+    )
     if not include_hidden:
         q = q.where(Review.is_hidden.is_(False))
     q = q.order_by(Review.created_at.desc())
@@ -253,24 +278,30 @@ async def manager_reply(
     )
     review = res.scalar_one_or_none()
     if not review:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Review not found."
+        )
 
     review.manager_reply = payload.reply
-    review.updated_at = datetime.now(timezone.utc)
+    review.updated_at = datetime.now(UTC)
 
-    db.add(AuditLog(
-        action="MANAGER_REPLY",
-        entity="Review",
-        entity_id=review.id,
-        actor_id=current_user.id,
-        new_value={"reply": payload.reply},
-    ))
+    db.add(
+        AuditLog(
+            action="MANAGER_REPLY",
+            entity="Review",
+            entity_id=review.id,
+            actor_id=current_user.id,
+            new_value={"reply": payload.reply},
+        )
+    )
 
     await db.commit()
     await db.refresh(review)
 
     final_res = await db.execute(
-        select(Review).options(selectinload(Review.menu_item)).where(Review.id == review.id)
+        select(Review)
+        .options(selectinload(Review.menu_item))
+        .where(Review.id == review.id)
     )
     return _build_review_out(final_res.scalar_one())
 
@@ -289,23 +320,29 @@ async def toggle_review_visibility(
     )
     review = res.scalar_one_or_none()
     if not review:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Review not found."
+        )
 
     review.is_hidden = hide
-    review.updated_at = datetime.now(timezone.utc)
+    review.updated_at = datetime.now(UTC)
 
     action = "HIDE_REVIEW" if hide else "RESTORE_REVIEW"
-    db.add(AuditLog(
-        action=action,
-        entity="Review",
-        entity_id=review.id,
-        actor_id=current_user.id,
-        new_value={"is_hidden": hide},
-    ))
+    db.add(
+        AuditLog(
+            action=action,
+            entity="Review",
+            entity_id=review.id,
+            actor_id=current_user.id,
+            new_value={"is_hidden": hide},
+        )
+    )
 
     await db.commit()
 
     final_res = await db.execute(
-        select(Review).options(selectinload(Review.menu_item)).where(Review.id == review.id)
+        select(Review)
+        .options(selectinload(Review.menu_item))
+        .where(Review.id == review.id)
     )
     return _build_review_out(final_res.scalar_one())

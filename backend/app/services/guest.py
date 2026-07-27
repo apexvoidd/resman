@@ -5,7 +5,8 @@ queue allocation, customer arrival verification, and cooldown enforcement.
 
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
+import uuid
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -16,7 +17,7 @@ from app.config.settings import settings
 from app.models.audit import AuditLog
 from app.models.customer import GuestSession
 from app.models.notification import Notification
-from app.models.restaurant import Branch
+from app.models.restaurant import Branch, Restaurant
 from app.models.table import DiningTable, QueueEntry
 from app.schemas.guest import (
     GuestFindTableInput,
@@ -30,8 +31,6 @@ RESERVATION_DURATION_MINUTES = 5
 COOLDOWN_DURATION_MINUTES = 5
 SESSION_DURATION_HOURS = 2
 
-
-from app.models.restaurant import Restaurant
 
 async def _get_default_branch(db: AsyncSession) -> Branch:
     """Fetch or auto-create default active branch."""
@@ -88,7 +87,7 @@ async def get_or_create_guest_session(
     db: AsyncSession, session_token: str | None = None
 ) -> GuestSession:
     """Retrieve an existing valid session or create a new token-backed GuestSession."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if session_token:
         result = await db.execute(
@@ -101,7 +100,7 @@ async def get_or_create_guest_session(
             # Normalize expires_at to UTC-aware for comparison (SQLite returns naive datetimes)
             exp = existing.expires_at
             if exp is not None and exp.tzinfo is None:
-                exp = exp.replace(tzinfo=timezone.utc)
+                exp = exp.replace(tzinfo=UTC)
             # Session is active — return as-is or extend if expired with table
             if existing.is_active:
                 if exp is not None and exp <= now and existing.table_id is not None:
@@ -128,7 +127,7 @@ async def get_or_create_guest_session(
 
 async def release_expired_reservations(db: AsyncSession, branch_id: UUID) -> None:
     """Find and release any reservations that have passed their 5-minute expiry time."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     expired_result = await db.execute(
         select(GuestSession).where(
@@ -209,7 +208,7 @@ async def find_table_or_enqueue(
     3. Lock candidate tables (FOR UPDATE) & pick smallest fitting group.
     4. If none available, append to queue.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     cd_until = _ensure_utc(session.cooldown_until)
     if cd_until and cd_until > now:
@@ -239,7 +238,8 @@ async def find_table_or_enqueue(
             remaining_seconds=rem_sec,
             verification_status=session.verification_status,
             rejection_reason=session.rejection_reason,
-            menu_unlocked=session.verification_status == "confirmed" or (table and table.status == "occupied"),
+            menu_unlocked=session.verification_status == "confirmed"
+            or (table and table.status == "occupied"),
             message=f"Table {table.table_number if table else ''} is reserved for your session.",
         )
 
@@ -287,7 +287,11 @@ async def find_table_or_enqueue(
             menu_unlocked=False,
             message=(
                 f"Table {best_table.table_number} reserved for {RESERVATION_DURATION_MINUTES} minutes!"
-                + (f" Note: table seats {best_table.capacity} — please arrange extra seating with staff." if best_table.capacity < payload.guest_count else "")
+                + (
+                    f" Note: table seats {best_table.capacity} — please arrange extra seating with staff."
+                    if best_table.capacity < payload.guest_count
+                    else ""
+                )
             ),
         )
 
@@ -354,30 +358,31 @@ def _ensure_utc(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
-async def mark_at_table(
-    db: AsyncSession, session: GuestSession
-) -> GuestStatusOut:
+async def mark_at_table(db: AsyncSession, session: GuestSession) -> GuestStatusOut:
     """
     Customer presses 'I'm at my table':
     1. Validates or assigns an active table for the guest session.
     2. Transitions table status to 'awaiting_verification'.
     3. Notifies waiters in real time & writes AuditLog.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if not session.table_id:
         branch = await _get_default_branch(db)
         avail_res = await db.execute(
-            select(DiningTable).where(
+            select(DiningTable)
+            .where(
                 DiningTable.branch_id == branch.id,
                 DiningTable.is_active == True,  # noqa: E712
                 DiningTable.deleted_at.is_(None),
                 DiningTable.status == "available",
-            ).order_by(DiningTable.table_number.asc()).limit(1)
+            )
+            .order_by(DiningTable.table_number.asc())
+            .limit(1)
         )
         avail_tbl = avail_res.scalar_one_or_none()
         if avail_tbl:
@@ -407,7 +412,9 @@ async def mark_at_table(
 
     res_exp = _ensure_utc(session.reservation_expires_at)
     if table.status == "occupied":
-        rem_sec = int((res_exp - now).total_seconds()) if res_exp and res_exp > now else None
+        rem_sec = (
+            int((res_exp - now).total_seconds()) if res_exp and res_exp > now else None
+        )
         return GuestStatusOut(
             session_token=session.session_token,
             guest_name=session.guest_name,
@@ -443,7 +450,10 @@ async def mark_at_table(
         entity="DiningTable",
         entity_id=table.id,
         old_value={"status": old_status},
-        new_value={"status": "awaiting_verification", "session_token": session.session_token},
+        new_value={
+            "status": "awaiting_verification",
+            "session_token": session.session_token,
+        },
     )
     db.add(audit)
 
@@ -467,7 +477,9 @@ async def mark_at_table(
     await db.commit()
     await db.refresh(table)
 
-    rem_sec = int((res_exp - now).total_seconds()) if res_exp and res_exp > now else None
+    rem_sec = (
+        int((res_exp - now).total_seconds()) if res_exp and res_exp > now else None
+    )
     return GuestStatusOut(
         session_token=session.session_token,
         guest_name=session.guest_name,
@@ -490,7 +502,7 @@ async def cancel_guest_reservation(
     db: AsyncSession, session: GuestSession
 ) -> GuestStatusOut:
     """Cancel table reservation or queue entry & initiate 5-minute cooldown."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cooldown_expiry = now + timedelta(minutes=COOLDOWN_DURATION_MINUTES)
 
     if session.table_id:
@@ -534,7 +546,7 @@ async def get_guest_session_status(
     db: AsyncSession, session: GuestSession
 ) -> GuestStatusOut:
     """Fetch current live status for a guest session."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     res_exp = _ensure_utc(session.reservation_expires_at)
     if (
@@ -561,8 +573,14 @@ async def get_guest_session_status(
         )
         table = tbl_res.scalar_one_or_none()
         if table:
-            rem_sec = int((res_exp - now).total_seconds()) if res_exp and res_exp > now else None
-            menu_unlocked = (session.verification_status == "confirmed") or (table.status == "occupied")
+            rem_sec = (
+                int((res_exp - now).total_seconds())
+                if res_exp and res_exp > now
+                else None
+            )
+            menu_unlocked = (session.verification_status == "confirmed") or (
+                table.status == "occupied"
+            )
             return GuestStatusOut(
                 session_token=session.session_token,
                 guest_name=session.guest_name,
@@ -643,7 +661,11 @@ async def get_guest_session_status(
                 cooldown_remaining_seconds=cooldown_rem_sec,
                 message=(
                     f"🎉 Table {available_table.table_number} reserved for you!"
-                    + (f" Note: table seats {available_table.capacity} — please arrange extra seating with staff." if available_table.capacity < guest_count else "")
+                    + (
+                        f" Note: table seats {available_table.capacity} — please arrange extra seating with staff."
+                        if available_table.capacity < guest_count
+                        else ""
+                    )
                 ),
             )
 

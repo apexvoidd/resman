@@ -62,7 +62,12 @@ async def _assign_default_role_by_email(db: AsyncSession, user: User) -> None:
         if role:
             db.add(UserRole(user_id=user.id, role_id=role.id, branch_id=None))
             await db.commit()
-            logger.info("Auto-assigned role %s to user %s (%s)", target_code, user.id, user.email)
+            logger.info(
+                "Auto-assigned role %s to user %s (%s)",
+                target_code,
+                user.id,
+                user.email,
+            )
 
 
 async def get_or_create_user(
@@ -77,14 +82,12 @@ async def get_or_create_user(
     """
     # Check if any superadmin exists in the DB
     superadmin_count = await db.execute(
-        select(func.count(User.id)).where(User.is_superadmin == True)
+        select(func.count(User.id)).where(User.is_superadmin == True)  # noqa: E712
     )
     has_superadmin = (superadmin_count.scalar_one_or_none() or 0) > 0
 
     # 1. Try to find existing user
-    result = await db.execute(
-        select(User).where(User.clerk_user_id == clerk_user_id)
-    )
+    result = await db.execute(select(User).where(User.clerk_user_id == clerk_user_id))
     user: User | None = result.scalar_one_or_none()
 
     if user is not None:
@@ -157,5 +160,10 @@ async def get_or_create_user(
     await db.commit()
     await db.refresh(user)
     await _assign_default_role_by_email(db, user)
-    logger.info("Created local user %s for Clerk ID %s (is_superadmin=%s)", user.id, clerk_user_id, is_admin)
+    logger.info(
+        "Created local user %s for Clerk ID %s (is_superadmin=%s)",
+        user.id,
+        clerk_user_id,
+        is_admin,
+    )
     return user

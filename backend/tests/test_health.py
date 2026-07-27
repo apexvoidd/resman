@@ -32,8 +32,9 @@ async def test_health_endpoint():
 def test_db_url_sslmode_formatting():
     from app.db.session import get_async_db_url_and_args
 
-    render_url = "postgresql://user:pass@dpg-xxxx-a.render.com/restaurant_db?sslmode=require"
+    render_url = (
+        "postgresql://user:pass@dpg-xxxx-a.render.com/restaurant_db?sslmode=require"
+    )
     url, connect_args = get_async_db_url_and_args(render_url)
     assert url == "postgresql+asyncpg://user:pass@dpg-xxxx-a.render.com/restaurant_db"
     assert connect_args == {"ssl": True}
-

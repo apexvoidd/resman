@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.schemas.order import OrderCreate, OrderOut, OrderUpdate
-from app.services.guest import get_or_create_guest_session
 from app.services import order as order_service
+from app.services.guest import get_or_create_guest_session
 
 router = APIRouter(prefix="/orders", tags=["Customer Cart & Ordering"])
 
@@ -48,7 +48,9 @@ async def get_session_orders(
     """Fetch active and past orders from the current dining session."""
     if x_session_token:
         from sqlalchemy import select
+
         from app.models.customer import GuestSession
+
         res = await db.execute(
             select(GuestSession).where(GuestSession.session_token == x_session_token)
         )

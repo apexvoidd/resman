@@ -21,7 +21,10 @@ class OrderItemCreate(BaseModel):
 
 
 class OrderCreate(BaseModel):
-    items: Annotated[list[OrderItemCreate], Field(min_length=1, description="Cart must contain at least one item")]
+    items: Annotated[
+        list[OrderItemCreate],
+        Field(min_length=1, description="Cart must contain at least one item"),
+    ]
     notes: Annotated[str | None, Field(max_length=500)] = None
     idempotency_key: Annotated[str | None, Field(max_length=100)] = None
 
@@ -80,8 +83,11 @@ class OrderOut(BaseModel):
 
 # --- KDS SCHEMAS ---
 
+
 class AcceptOrderInput(BaseModel):
-    estimated_prep_minutes: int = Field(..., ge=1, le=180, description="Estimated prep time in minutes")
+    estimated_prep_minutes: int = Field(
+        ..., ge=1, le=180, description="Estimated prep time in minutes"
+    )
 
 
 class UpdatePrepTimeInput(BaseModel):

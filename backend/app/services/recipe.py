@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 from app.config.settings import settings
 from app.models.menu import MenuItem
 from app.models.notification import Notification
-from app.models.order import Order, OrderItem
+from app.models.order import Order
 from app.models.recipe import Ingredient, Recipe, RecipeIngredient, StockHistory
 from app.schemas.recipe import (
     RecipeCreatePayload,
@@ -72,6 +72,7 @@ def _build_recipe_out(recipe: Recipe, is_available: bool = True) -> RecipeOut:
 
 # --- AUTOMATIC MENU AVAILABILITY SYNC ---
 
+
 async def check_and_update_menu_item_availability(
     db: AsyncSession, menu_item_id: uuid.UUID
 ) -> bool:
@@ -83,7 +84,9 @@ async def check_and_update_menu_item_availability(
     res = await db.execute(
         select(MenuItem)
         .options(
-            selectinload(MenuItem.recipes).selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient)
+            selectinload(MenuItem.recipes)
+            .selectinload(Recipe.recipe_ingredients)
+            .selectinload(RecipeIngredient.ingredient)
         )
         .where(MenuItem.id == menu_item_id, MenuItem.deleted_at.is_(None))
     )
@@ -116,7 +119,9 @@ async def sync_menu_availability_for_ingredient(
 ) -> None:
     """Synchronize menu availability for all menu items that depend on a specific ingredient."""
     res = await db.execute(
-        select(RecipeIngredient.recipe_id).where(RecipeIngredient.ingredient_id == ingredient_id)
+        select(RecipeIngredient.recipe_id).where(
+            RecipeIngredient.ingredient_id == ingredient_id
+        )
     )
     recipe_ids = res.scalars().all()
     if not recipe_ids:
@@ -133,13 +138,16 @@ async def sync_menu_availability_for_ingredient(
 
 # --- RECIPE CRUD ---
 
+
 async def get_all_recipes(db: AsyncSession) -> list[RecipeOut]:
     """List all recipes with ingredients and makeable portion calculations."""
     res = await db.execute(
         select(Recipe)
         .options(
             selectinload(Recipe.menu_item),
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
+            selectinload(Recipe.recipe_ingredients).selectinload(
+                RecipeIngredient.ingredient
+            ),
         )
         .order_by(Recipe.name.asc())
     )
@@ -161,7 +169,9 @@ async def get_recipe_by_menu_item_id(
         select(Recipe)
         .options(
             selectinload(Recipe.menu_item),
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
+            selectinload(Recipe.recipe_ingredients).selectinload(
+                RecipeIngredient.ingredient
+            ),
         )
         .where(Recipe.menu_item_id == menu_item_id)
     )
@@ -178,10 +188,14 @@ async def create_or_update_recipe(
 ) -> RecipeOut:
     """Create or update a menu item recipe with ingredient validation and auto availability sync."""
     # Verify menu item exists
-    mi_res = await db.execute(select(MenuItem).where(MenuItem.id == payload.menu_item_id))
+    mi_res = await db.execute(
+        select(MenuItem).where(MenuItem.id == payload.menu_item_id)
+    )
     menu_item = mi_res.scalar_one_or_none()
     if not menu_item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Menu item not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Menu item not found."
+        )
 
     # Check for existing recipe
     rec_res = await db.execute(
@@ -211,7 +225,9 @@ async def create_or_update_recipe(
     # Add ingredients
     for ing_input in payload.ingredients:
         # Verify ingredient exists
-        ing_res = await db.execute(select(Ingredient).where(Ingredient.id == ing_input.ingredient_id))
+        ing_res = await db.execute(
+            select(Ingredient).where(Ingredient.id == ing_input.ingredient_id)
+        )
         ing_obj = ing_res.scalar_one_or_none()
         if not ing_obj:
             raise HTTPException(
@@ -236,7 +252,10 @@ async def create_or_update_recipe(
 
     res_out = await get_recipe_by_menu_item_id(db, payload.menu_item_id)
     if not res_out:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve saved recipe.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve saved recipe.",
+        )
     return res_out
 
 
@@ -245,7 +264,9 @@ async def delete_recipe(db: AsyncSession, recipe_id: uuid.UUID) -> None:
     res = await db.execute(select(Recipe).where(Recipe.id == recipe_id))
     recipe = res.scalar_one_or_none()
     if not recipe:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found."
+        )
 
     menu_item_id = recipe.menu_item_id
     await db.delete(recipe)
@@ -260,6 +281,7 @@ async def delete_recipe(db: AsyncSession, recipe_id: uuid.UUID) -> None:
 
 
 # --- AUTOMATIC INVENTORY DEDUCTION & STOCK VERIFICATION ON ORDER ACCEPTANCE ---
+
 
 async def deduct_inventory_for_order(
     db: AsyncSession, order: Order, user_id: uuid.UUID | None = None

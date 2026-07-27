@@ -118,9 +118,7 @@ class Payment(BaseModel):
     razorpay_order_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, index=True
     )
-    razorpay_signature: Mapped[str | None] = mapped_column(
-        String(500), nullable=True
-    )
+    razorpay_signature: Mapped[str | None] = mapped_column(String(500), nullable=True)
     cashier_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),

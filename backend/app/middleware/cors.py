@@ -49,5 +49,3 @@ def setup_cors(app: FastAPI) -> None:
         expose_headers=["*"],
         max_age=600,
     )
-
-

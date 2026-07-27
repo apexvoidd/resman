@@ -4,12 +4,12 @@ Pydantic DTO schemas for Category and Menu Item management.
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
 # --- CATEGORY SCHEMAS ---
+
 
 class CategoryOut(BaseModel):
     """Category response representation DTO."""
@@ -56,6 +56,7 @@ class CategoryUpdate(BaseModel):
 
 # --- MENU ITEM SCHEMAS ---
 
+
 class MenuItemOut(BaseModel):
     """Menu item response representation DTO."""
 
@@ -86,7 +87,9 @@ class MenuItemCreate(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=255)]
     category_id: uuid.UUID
     description: Annotated[str | None, Field(max_length=1000)] = None
-    price: float = Field(..., gt=0, description="Selling price (must be greater than 0)")
+    price: float = Field(
+        ..., gt=0, description="Selling price (must be greater than 0)"
+    )
     preparation_time_minutes: int = Field(default=15, ge=1, le=240)
     image_url: str | None = None
     is_available: bool = True

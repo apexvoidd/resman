@@ -66,7 +66,9 @@ async def update_settings(
     status_code=status.HTTP_200_OK,
 )
 async def upload_logo(
-    file: UploadFile = File(..., description="Logo image (JPEG / PNG / WebP / GIF, max 5 MB)"),
+    file: UploadFile = File(
+        ..., description="Logo image (JPEG / PNG / WebP / GIF, max 5 MB)"
+    ),
     _: User = Depends(require_role(["admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:

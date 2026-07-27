@@ -2,9 +2,7 @@
 
 > **Vibethon 6.0** · Team **ApexVoid** · Solo Participant: **Ayush Kumar**
 
-[![CI](https://github.com/apexvoidd/resman/actions/workflows/ci.yml/badge.svg)](https://github.com/apexvoidd/resman/actions)
-![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20Next.js-blue)
-![License](https://img.shields.io/badge/license-Proprietary-red)
+
 
 ---
 

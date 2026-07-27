@@ -11,8 +11,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class RecipeIngredientInput(BaseModel):
     ingredient_id: uuid.UUID
-    quantity: float = Field(..., gt=0.0, description="Required quantity per portion must be strictly positive")
-    unit_of_measure: Literal["kg", "g", "L", "ml", "pcs"] = Field(..., description="Unit of measurement")
+    quantity: float = Field(
+        ...,
+        gt=0.0,
+        description="Required quantity per portion must be strictly positive",
+    )
+    unit_of_measure: Literal["kg", "g", "L", "ml", "pcs"] = Field(
+        ..., description="Unit of measurement"
+    )
 
 
 class RecipeIngredientOut(BaseModel):
@@ -43,7 +49,9 @@ class RecipeCreatePayload(BaseModel):
         seen = set()
         for item in value:
             if item.ingredient_id in seen:
-                raise ValueError("Duplicate ingredients in a single recipe are not allowed.")
+                raise ValueError(
+                    "Duplicate ingredients in a single recipe are not allowed."
+                )
             seen.add(item.ingredient_id)
         return value
 

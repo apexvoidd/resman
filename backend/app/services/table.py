@@ -2,16 +2,16 @@
 Table Management service layer for DB operations and Waiter Verification workflows.
 """
 
+import logging
 import math
 import uuid
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
-
 from app.models.audit import AuditLog
 from app.models.customer import GuestSession
 from app.models.notification import Notification
@@ -26,7 +26,6 @@ from app.schemas.table import (
     TableUpdate,
 )
 
-import logging
 logger = logging.getLogger("app.services.table")
 
 
@@ -50,9 +49,7 @@ async def get_or_create_default_branch(db: AsyncSession) -> Branch:
     Returns the first active branch, creating a default restaurant and branch
     if none exists yet.
     """
-    result = await db.execute(
-        select(Branch).where(Branch.is_active.is_(True)).limit(1)
-    )
+    result = await db.execute(select(Branch).where(Branch.is_active.is_(True)).limit(1))
     branch = result.scalar_one_or_none()
     if branch is not None:
         return branch
@@ -124,7 +121,9 @@ async def get_table_list(
     total = total_result.scalar_one()
 
     offset = (page - 1) * page_size
-    query = query.order_by(DiningTable.table_number.asc()).offset(offset).limit(page_size)
+    query = (
+        query.order_by(DiningTable.table_number.asc()).offset(offset).limit(page_size)
+    )
 
     result = await db.execute(query)
     tables = result.scalars().all()
@@ -296,17 +295,18 @@ def _ensure_utc(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
 async def get_pending_verifications(db: AsyncSession) -> list[PendingVerificationTable]:
     """Fetch all tables currently awaiting waiter verification."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     branch = await get_or_create_default_branch(db)
 
     # Release any expired reservations so tables don't stay stuck
     from app.services.guest import release_expired_reservations
+
     try:
         await release_expired_reservations(db, branch.id)
     except Exception:
@@ -364,7 +364,7 @@ async def verify_customer_arrival(
     - If confirm: table -> 'occupied', guest_session -> 'confirmed', menu unlocked.
     - If reject: table -> 'reserved', guest_session -> 'rejected' with reason.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     stmt = select(DiningTable).where(
         DiningTable.id == table_id, DiningTable.deleted_at.is_(None)
@@ -408,10 +408,15 @@ async def verify_customer_arrival(
                 entity="DiningTable",
                 entity_id=table.id,
                 old_value={"status": "awaiting_verification"},
-                new_value={"status": "occupied", "waiter_user_id": str(current_user.id)},
+                new_value={
+                    "status": "occupied",
+                    "waiter_user_id": str(current_user.id),
+                },
             )
         )
-        staff_name = getattr(current_user, "full_name", getattr(current_user, "email", "Staff"))
+        staff_name = getattr(
+            current_user, "full_name", getattr(current_user, "email", "Staff")
+        )
         db.add(
             Notification(
                 recipient_type="manager",
@@ -419,14 +424,19 @@ async def verify_customer_arrival(
                 message=f"Staff member {staff_name} confirmed guest arrival for Table {table.table_number}.",
                 notification_type="arrival_confirmed",
                 status="unread",
-                payload_json={"table_id": str(table.id), "table_number": table.table_number},
+                payload_json={
+                    "table_id": str(table.id),
+                    "table_number": table.table_number,
+                },
             )
         )
     else:  # reject
         table.status = "reserved"
         if sess:
             sess.verification_status = "rejected"
-            sess.rejection_reason = payload.reason or "Arrival verification rejected by staff member."
+            sess.rejection_reason = (
+                payload.reason or "Arrival verification rejected by staff member."
+            )
 
         db.add(
             AuditLog(
@@ -450,7 +460,7 @@ async def check_no_order_reminders(db: AsyncSession) -> None:
     If a table has been occupied for 3+ minutes and no order is placed,
     send a reminder notification to waiters.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     threshold = now - timedelta(minutes=3)
 
     result = await db.execute(
@@ -481,7 +491,10 @@ async def check_no_order_reminders(db: AsyncSession) -> None:
                     message=f"Table {tbl.table_number} ({sess.guest_name or 'Guest'}) has been occupied for over 3 minutes with no order placed.",
                     notification_type="no_order_reminder",
                     status="unread",
-                    payload_json={"table_id": str(tbl.id), "table_number": tbl.table_number},
+                    payload_json={
+                        "table_id": str(tbl.id),
+                        "table_number": tbl.table_number,
+                    },
                 )
             )
     await db.commit()
@@ -491,11 +504,13 @@ async def get_cleaning_queue(db: AsyncSession) -> list[TableOut]:
     """Fetch all tables currently in 'cleaning' status."""
     branch = await get_or_create_default_branch(db)
     result = await db.execute(
-        select(DiningTable).where(
+        select(DiningTable)
+        .where(
             DiningTable.branch_id == branch.id,
             DiningTable.status == "cleaning",
             DiningTable.deleted_at.is_(None),
-        ).order_by(DiningTable.table_number.asc())
+        )
+        .order_by(DiningTable.table_number.asc())
     )
     tables = result.scalars().all()
     return [_build_table_out(t) for t in tables]

@@ -7,11 +7,8 @@ Unit tests for Billing & Payment service:
 - Split bill calculations (equal, itemized, custom)
 """
 
-import hmac
 import hashlib
-import pytest
-from app.schemas.billing import SplitBillInput
-from app.services.billing import calculate_split_bill
+import hmac
 
 
 def test_hmac_signature_verification_logic():
@@ -21,13 +18,13 @@ def test_hmac_signature_verification_logic():
     razorpay_payment_id = "pay_987654321"
 
     msg = f"{razorpay_order_id}|{razorpay_payment_id}"
-    expected_sig = hmac.new(
-        secret.encode(), msg.encode(), hashlib.sha256
-    ).hexdigest()
+    expected_sig = hmac.new(secret.encode(), msg.encode(), hashlib.sha256).hexdigest()
 
     # Re-verify
     check_sig = hmac.new(
-        secret.encode(), f"{razorpay_order_id}|{razorpay_payment_id}".encode(), hashlib.sha256
+        secret.encode(),
+        f"{razorpay_order_id}|{razorpay_payment_id}".encode(),
+        hashlib.sha256,
     ).hexdigest()
 
     assert hmac.compare_digest(expected_sig, check_sig) is True

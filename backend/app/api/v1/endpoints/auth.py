@@ -101,9 +101,9 @@ async def get_my_roles(
         select(UserRole)
         .where(UserRole.user_id == current_user.id)
         .options(
-            selectinload(UserRole.role).selectinload(Role.role_permissions).selectinload(
-                RolePermission.permission
-            )
+            selectinload(UserRole.role)
+            .selectinload(Role.role_permissions)
+            .selectinload(RolePermission.permission)
         )
     )
     user_roles = result.scalars().all()

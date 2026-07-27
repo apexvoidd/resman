@@ -12,16 +12,13 @@ Requires DATABASE_URL to be set in backend/.env
 
 import asyncio
 import sys
-import uuid
 from pathlib import Path
 
 # Make sure the backend package is on the path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.config.settings import settings
 from app.models.staff import Permission, Role, RolePermission
 
 # ─── Role definitions ─────────────────────────────────────────────────────────

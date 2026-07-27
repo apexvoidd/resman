@@ -9,14 +9,13 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
-    HTTPException,
     Query,
     UploadFile,
     status,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user, require_role
+from app.core.dependencies import require_role
 from app.db.session import get_db
 from app.models.staff import User
 from app.schemas.menu import (
@@ -35,6 +34,7 @@ router = APIRouter(prefix="/menu", tags=["Menu & Category Management"])
 
 
 # --- CATEGORY ENDPOINTS ---
+
 
 @router.get(
     "/categories",
@@ -99,6 +99,7 @@ async def toggle_category_status(
 
 # --- MENU ITEM ENDPOINTS ---
 
+
 @router.get(
     "/items",
     response_model=MenuItemListResponse,
@@ -108,7 +109,9 @@ async def toggle_category_status(
 async def list_menu_items(
     search: str | None = Query(None, description="Search by dish name or description"),
     category_id: uuid.UUID | None = Query(None, description="Filter by category ID"),
-    is_available: bool | None = Query(None, description="Filter by availability (true/false)"),
+    is_available: bool | None = Query(
+        None, description="Filter by availability (true/false)"
+    ),
     is_vegetarian: bool | None = Query(None, description="Filter vegetarian dishes"),
     is_vegan: bool | None = Query(None, description="Filter vegan dishes"),
     is_jain: bool | None = Query(None, description="Filter Jain dishes"),
@@ -222,4 +225,3 @@ async def upload_menu_image(
         folder="menu-items",
     )
     return {"image_url": image_url}
-

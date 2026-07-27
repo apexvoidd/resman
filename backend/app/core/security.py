@@ -84,4 +84,3 @@ def verify_clerk_token(token: str) -> dict:
             detail="Could not verify authentication token.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-

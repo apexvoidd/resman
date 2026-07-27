@@ -4,8 +4,8 @@ priority escalation, preparation time estimation, pause/resume, and waiter notif
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config.settings import settings
-from app.models.customer import GuestSession
 from app.models.notification import Notification
 from app.models.order import Order, OrderItem, OrderStatusHistory
 from app.schemas.order import OrderOut
@@ -64,7 +63,9 @@ async def get_kds_active_orders(
 
     if status_filter in ("active", "all", None, ""):
         # By default filter to active orders (pending, accepted, preparing, ready, paused)
-        query = query.where(Order.status.in_(["pending", "accepted", "preparing", "ready", "paused"]))
+        query = query.where(
+            Order.status.in_(["pending", "accepted", "preparing", "ready", "paused"])
+        )
     elif status_filter == "everything":
         # Return all orders including completed and cancelled
         pass
@@ -107,12 +108,17 @@ async def _get_order_for_update(db: AsyncSession, order_id: uuid.UUID) -> Order:
     result = await db.execute(stmt)
     order = result.scalar_one_or_none()
     if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Order not found."
+        )
     return order
 
 
 async def accept_order(
-    db: AsyncSession, order_id: uuid.UUID, estimated_prep_minutes: int, user_id: uuid.UUID | None = None
+    db: AsyncSession,
+    order_id: uuid.UUID,
+    estimated_prep_minutes: int,
+    user_id: uuid.UUID | None = None,
 ) -> OrderOut:
     """Accept order and set estimated preparation time."""
     order = await _get_order_for_update(db, order_id)
@@ -121,7 +127,7 @@ async def accept_order(
     # Perform automatic inventory stock verification and atomic deduction
     await deduct_inventory_for_order(db, order, user_id)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     prev_st = order.status
     order.status = "accepted"
     order.estimated_prep_minutes = estimated_prep_minutes
@@ -141,9 +147,7 @@ async def accept_order(
 
     # Re-query
     final_res = await db.execute(
-        select(Order)
-        .options(*_order_select_options())
-        .where(Order.id == order.id)
+        select(Order).options(*_order_select_options()).where(Order.id == order.id)
     )
     return _build_order_out(final_res.scalar_one())
 
@@ -171,9 +175,7 @@ async def start_preparing(
     await db.commit()
 
     final_res = await db.execute(
-        select(Order)
-        .options(*_order_select_options())
-        .where(Order.id == order.id)
+        select(Order).options(*_order_select_options()).where(Order.id == order.id)
     )
     return _build_order_out(final_res.scalar_one())
 
@@ -218,9 +220,7 @@ async def mark_order_ready(
     await db.commit()
 
     final_res = await db.execute(
-        select(Order)
-        .options(*_order_select_options())
-        .where(Order.id == order.id)
+        select(Order).options(*_order_select_options()).where(Order.id == order.id)
     )
     return _build_order_out(final_res.scalar_one())
 
@@ -248,19 +248,20 @@ async def mark_order_completed(
     await db.commit()
 
     final_res = await db.execute(
-        select(Order)
-        .options(*_order_select_options())
-        .where(Order.id == order.id)
+        select(Order).options(*_order_select_options()).where(Order.id == order.id)
     )
     return _build_order_out(final_res.scalar_one())
 
 
 async def update_prep_time(
-    db: AsyncSession, order_id: uuid.UUID, estimated_prep_minutes: int, user_id: uuid.UUID | None = None
+    db: AsyncSession,
+    order_id: uuid.UUID,
+    estimated_prep_minutes: int,
+    user_id: uuid.UUID | None = None,
 ) -> OrderOut:
     """Update estimated preparation time."""
     order = await _get_order_for_update(db, order_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     order.estimated_prep_minutes = estimated_prep_minutes
     order.estimated_completion_at = now + timedelta(minutes=estimated_prep_minutes)
 
@@ -277,15 +278,16 @@ async def update_prep_time(
     await db.commit()
 
     final_res = await db.execute(
-        select(Order)
-        .options(*_order_select_options())
-        .where(Order.id == order.id)
+        select(Order).options(*_order_select_options()).where(Order.id == order.id)
     )
     return _build_order_out(final_res.scalar_one())
 
 
 async def update_priority(
-    db: AsyncSession, order_id: uuid.UUID, priority: str, user_id: uuid.UUID | None = None
+    db: AsyncSession,
+    order_id: uuid.UUID,
+    priority: str,
+    user_id: uuid.UUID | None = None,
 ) -> OrderOut:
     """Update order priority (Normal, High, Urgent). Manager role."""
     order = await _get_order_for_update(db, order_id)
@@ -304,24 +306,29 @@ async def update_priority(
     await db.commit()
 
     final_res = await db.execute(
-        select(Order)
-        .options(*_order_select_options())
-        .where(Order.id == order.id)
+        select(Order).options(*_order_select_options()).where(Order.id == order.id)
     )
     return _build_order_out(final_res.scalar_one())
 
 
 async def pause_order(
-    db: AsyncSession, order_id: uuid.UUID, reason: str | None = None, user_id: uuid.UUID | None = None
+    db: AsyncSession,
+    order_id: uuid.UUID,
+    reason: str | None = None,
+    user_id: uuid.UUID | None = None,
 ) -> OrderOut:
     """Temporarily pause order preparation."""
     order = await _get_order_for_update(db, order_id)
     prev_st = order.status
     order.is_paused = True
-    order.paused_at = datetime.now(timezone.utc)
+    order.paused_at = datetime.now(UTC)
     order.status = "paused"
 
-    note_text = f"Order paused by kitchen. Reason: {reason}" if reason else "Order paused by kitchen."
+    note_text = (
+        f"Order paused by kitchen. Reason: {reason}"
+        if reason
+        else "Order paused by kitchen."
+    )
     db.add(
         OrderStatusHistory(
             order_id=order.id,
@@ -335,9 +342,7 @@ async def pause_order(
     await db.commit()
 
     final_res = await db.execute(
-        select(Order)
-        .options(*_order_select_options())
-        .where(Order.id == order.id)
+        select(Order).options(*_order_select_options()).where(Order.id == order.id)
     )
     return _build_order_out(final_res.scalar_one())
 
@@ -365,9 +370,7 @@ async def resume_order(
     await db.commit()
 
     final_res = await db.execute(
-        select(Order)
-        .options(*_order_select_options())
-        .where(Order.id == order.id)
+        select(Order).options(*_order_select_options()).where(Order.id == order.id)
     )
     return _build_order_out(final_res.scalar_one())
 
@@ -393,7 +396,9 @@ async def get_waiter_active_orders(
         )
         .where(
             Order.deleted_at.is_(None),
-            Order.status.in_(["pending", "accepted", "preparing", "ready", "paused", "completed"]),
+            Order.status.in_(
+                ["pending", "accepted", "preparing", "ready", "paused", "completed"]
+            ),
         )
         .order_by(Order.created_at.asc())
     )
@@ -417,7 +422,9 @@ async def get_waiter_active_orders(
             sess_bills_res = await db.execute(
                 select(Bill).where(
                     Bill.order_id.in_(
-                        select(Order.id).where(Order.guest_session_id == order.guest_session_id)
+                        select(Order.id).where(
+                            Order.guest_session_id == order.guest_session_id
+                        )
                     ),
                     Bill.deleted_at.is_(None),
                 )

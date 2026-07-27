@@ -1,8 +1,7 @@
 from collections.abc import AsyncGenerator
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
-from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from app.config.settings import settings
 from app.models.base import BaseModel
@@ -20,9 +19,11 @@ def get_async_db_url_and_args(raw_url: str) -> tuple[str, dict]:
 
     url = raw_url
     if url.startswith("postgres://"):
-        url = "postgresql+asyncpg://" + url[len("postgres://"):]
-    elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
-        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+        url = "postgresql+asyncpg://" + url[len("postgres://") :]
+    elif url.startswith("postgresql://") and not url.startswith(
+        "postgresql+asyncpg://"
+    ):
+        url = "postgresql+asyncpg://" + url[len("postgresql://") :]
 
     parsed = urlparse(url)
     query_params = parse_qs(parsed.query)
@@ -30,14 +31,16 @@ def get_async_db_url_and_args(raw_url: str) -> tuple[str, dict]:
     sslmode = query_params.pop("sslmode", None)
     new_query = urlencode(query_params, doseq=True)
 
-    cleaned_url = urlunparse((
-        parsed.scheme,
-        parsed.netloc,
-        parsed.path,
-        parsed.params,
-        new_query,
-        parsed.fragment
-    ))
+    cleaned_url = urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment,
+        )
+    )
 
     connect_args = {}
     if sslmode:
@@ -72,72 +75,155 @@ AsyncSessionLocal = async_sessionmaker(
 async def init_db() -> None:
     """Create tables and ensure missing columns are auto-added for local SQLite dev."""
     import app.models  # noqa: F401
+
     async with engine.begin() as conn:
         await conn.run_sync(BaseModel.metadata.create_all)
 
         def _sync_migrations(sync_conn):
             if settings.DATABASE_URL.startswith("sqlite"):
                 from sqlalchemy import inspect, text
+
                 inspector = inspect(sync_conn)
 
                 # Ensure guest_sessions columns
                 if "guest_sessions" in inspector.get_table_names():
                     cols = {c["name"] for c in inspector.get_columns("guest_sessions")}
                     if "is_locked" not in cols:
-                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN is_locked BOOLEAN DEFAULT 0 NOT NULL;"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE guest_sessions ADD COLUMN is_locked BOOLEAN DEFAULT 0 NOT NULL;"
+                            )
+                        )
                     if "bill_requested_at" not in cols:
-                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN bill_requested_at DATETIME;"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE guest_sessions ADD COLUMN bill_requested_at DATETIME;"
+                            )
+                        )
                     if "can_submit_review" not in cols:
-                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN can_submit_review BOOLEAN DEFAULT 0 NOT NULL;"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE guest_sessions ADD COLUMN can_submit_review BOOLEAN DEFAULT 0 NOT NULL;"
+                            )
+                        )
                     if "expires_at" not in cols:
-                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN expires_at DATETIME NOT NULL DEFAULT (datetime('now', '+2 hours'));"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE guest_sessions ADD COLUMN expires_at DATETIME NOT NULL DEFAULT (datetime('now', '+2 hours'));"
+                            )
+                        )
                     if "occupied_at" not in cols:
-                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN occupied_at DATETIME;"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE guest_sessions ADD COLUMN occupied_at DATETIME;"
+                            )
+                        )
                     if "verification_requested_at" not in cols:
-                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN verification_requested_at DATETIME;"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE guest_sessions ADD COLUMN verification_requested_at DATETIME;"
+                            )
+                        )
                     if "rejection_reason" not in cols:
-                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN rejection_reason VARCHAR(500);"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE guest_sessions ADD COLUMN rejection_reason VARCHAR(500);"
+                            )
+                        )
                     if "cooldown_until" not in cols:
-                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN cooldown_until DATETIME;"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE guest_sessions ADD COLUMN cooldown_until DATETIME;"
+                            )
+                        )
                     if "guest_email" not in cols:
-                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN guest_email VARCHAR(255);"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE guest_sessions ADD COLUMN guest_email VARCHAR(255);"
+                            )
+                        )
                     if "guest_count" not in cols:
-                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN guest_count INTEGER;"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE guest_sessions ADD COLUMN guest_count INTEGER;"
+                            )
+                        )
                     if "reservation_expires_at" not in cols:
-                        sync_conn.execute(text("ALTER TABLE guest_sessions ADD COLUMN reservation_expires_at DATETIME;"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE guest_sessions ADD COLUMN reservation_expires_at DATETIME;"
+                            )
+                        )
 
                 # Ensure reviews columns
                 if "reviews" in inspector.get_table_names():
                     cols = {c["name"] for c in inspector.get_columns("reviews")}
                     if "guest_session_id" not in cols:
-                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN guest_session_id CHAR(36);"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE reviews ADD COLUMN guest_session_id CHAR(36);"
+                            )
+                        )
                     if "menu_item_id" not in cols:
-                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN menu_item_id CHAR(36);"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE reviews ADD COLUMN menu_item_id CHAR(36);"
+                            )
+                        )
                     if "display_name" not in cols:
-                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN display_name VARCHAR(100);"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE reviews ADD COLUMN display_name VARCHAR(100);"
+                            )
+                        )
                     if "manager_reply" not in cols:
-                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN manager_reply TEXT;"))
+                        sync_conn.execute(
+                            text("ALTER TABLE reviews ADD COLUMN manager_reply TEXT;")
+                        )
                     if "is_hidden" not in cols:
-                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN is_hidden BOOLEAN DEFAULT 0 NOT NULL;"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE reviews ADD COLUMN is_hidden BOOLEAN DEFAULT 0 NOT NULL;"
+                            )
+                        )
                     if "is_verified" not in cols:
-                        sync_conn.execute(text("ALTER TABLE reviews ADD COLUMN is_verified BOOLEAN DEFAULT 1 NOT NULL;"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE reviews ADD COLUMN is_verified BOOLEAN DEFAULT 1 NOT NULL;"
+                            )
+                        )
 
                 # Ensure payments columns
                 if "payments" in inspector.get_table_names():
                     cols = {c["name"] for c in inspector.get_columns("payments")}
                     if "razorpay_order_id" not in cols:
-                        sync_conn.execute(text("ALTER TABLE payments ADD COLUMN razorpay_order_id VARCHAR(255);"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE payments ADD COLUMN razorpay_order_id VARCHAR(255);"
+                            )
+                        )
                     if "razorpay_signature" not in cols:
-                        sync_conn.execute(text("ALTER TABLE payments ADD COLUMN razorpay_signature VARCHAR(500);"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE payments ADD COLUMN razorpay_signature VARCHAR(500);"
+                            )
+                        )
                     if "cashier_user_id" not in cols:
-                        sync_conn.execute(text("ALTER TABLE payments ADD COLUMN cashier_user_id CHAR(36);"))
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE payments ADD COLUMN cashier_user_id CHAR(36);"
+                            )
+                        )
                     if "notes" not in cols:
-                        sync_conn.execute(text("ALTER TABLE payments ADD COLUMN notes TEXT;"))
+                        sync_conn.execute(
+                            text("ALTER TABLE payments ADD COLUMN notes TEXT;")
+                        )
 
         await conn.run_sync(_sync_migrations)
 
     try:
         from scripts.seed_roles import seed
+
         await seed()
     except Exception as e:
         print(f"Role seeding notice: {e}")

@@ -19,9 +19,15 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("guest_sessions", sa.Column("guest_name", sa.String(255), nullable=True))
-    op.add_column("guest_sessions", sa.Column("guest_email", sa.String(255), nullable=True))
-    op.add_column("guest_sessions", sa.Column("guest_count", sa.Integer(), nullable=True))
+    op.add_column(
+        "guest_sessions", sa.Column("guest_name", sa.String(255), nullable=True)
+    )
+    op.add_column(
+        "guest_sessions", sa.Column("guest_email", sa.String(255), nullable=True)
+    )
+    op.add_column(
+        "guest_sessions", sa.Column("guest_count", sa.Integer(), nullable=True)
+    )
     op.add_column(
         "guest_sessions",
         sa.Column("reservation_expires_at", sa.DateTime(timezone=True), nullable=True),

@@ -33,13 +33,29 @@ def upgrade() -> None:
         sa.Column("gst_number", sa.String(50), nullable=True),
         # Locale
         sa.Column("currency", sa.String(10), nullable=False, server_default="INR"),
-        sa.Column("timezone", sa.String(100), nullable=False, server_default="Asia/Kolkata"),
+        sa.Column(
+            "timezone", sa.String(100), nullable=False, server_default="Asia/Kolkata"
+        ),
         # Financial percentages
-        sa.Column("tax_percentage", sa.Numeric(5, 2), nullable=False, server_default="0"),
-        sa.Column("service_charge_percentage", sa.Numeric(5, 2), nullable=False, server_default="0"),
+        sa.Column(
+            "tax_percentage", sa.Numeric(5, 2), nullable=False, server_default="0"
+        ),
+        sa.Column(
+            "service_charge_percentage",
+            sa.Numeric(5, 2),
+            nullable=False,
+            server_default="0",
+        ),
         # Operational timeouts (minutes)
-        sa.Column("reservation_timeout_minutes", sa.Integer(), nullable=False, server_default="15"),
-        sa.Column("queue_timeout_minutes", sa.Integer(), nullable=False, server_default="30"),
+        sa.Column(
+            "reservation_timeout_minutes",
+            sa.Integer(),
+            nullable=False,
+            server_default="15",
+        ),
+        sa.Column(
+            "queue_timeout_minutes", sa.Integer(), nullable=False, server_default="30"
+        ),
         # Operating hours stored as HH:MM strings
         sa.Column("opening_time", sa.String(5), nullable=True),
         sa.Column("closing_time", sa.String(5), nullable=True),
@@ -74,6 +90,8 @@ def downgrade() -> None:
     op.drop_constraint(
         "uq_restaurant_settings_restaurant", "restaurant_settings", type_="unique"
     )
-    op.drop_index("ix_restaurant_settings_restaurant_id", table_name="restaurant_settings")
+    op.drop_index(
+        "ix_restaurant_settings_restaurant_id", table_name="restaurant_settings"
+    )
     op.drop_index("ix_restaurant_settings_id", table_name="restaurant_settings")
     op.drop_table("restaurant_settings")
