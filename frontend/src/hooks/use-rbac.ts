@@ -6,8 +6,9 @@
  */
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export interface Permission {
   id: string;
@@ -68,17 +69,28 @@ export function getDesignatedDashboard(roles: Role[], isSuperadmin: boolean): st
 }
 
 export function useRBAC() {
-  const { getToken, isSignedIn } = useAuth();
+  const { userId, getToken, isSignedIn } = useAuth();
+  const queryClient = useQueryClient();
+  const prevUserIdRef = useRef<string | null | undefined>(userId);
+
+  // Clear query cache when user account changes or signs out
+  useEffect(() => {
+    if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
+      queryClient.clear();
+    }
+    prevUserIdRef.current = userId;
+  }, [userId, queryClient]);
 
   const { data, isLoading, isError } = useQuery<UserRolesResponse>({
-    queryKey: ["me", "roles"],
+    queryKey: ["me", "roles", userId ?? "anonymous"],
     queryFn: async () => {
       const token = await getToken();
       if (!token) throw new Error("No auth token");
       return fetchMyRoles(token);
     },
-    enabled: !!isSignedIn,
-    staleTime: 5 * 60 * 1000, // cache for 5 minutes
+    enabled: !!isSignedIn && !!userId,
+    staleTime: 10 * 1000, // 10 seconds per user session
+    gcTime: 0, // do not persist stale user roles across session switches
   });
 
   const isSuperadmin = data?.is_superadmin ?? false;
