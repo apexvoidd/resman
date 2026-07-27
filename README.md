@@ -2,7 +2,18 @@
 
 > **Vibeathon 6.0** · Team **ApexVoid** · Solo Participant: **Ayush Kumar**
 
+---
 
+## 🌐 Live Deployments & API Documentation
+
+| Component | URL | Details / Note |
+|---|---|---|
+| **Frontend App** | [https://resman-aqqx.vercel.app](https://resman-aqqx.vercel.app) | 🟢 Live on Vercel |
+| **Backend API** | [https://resman-backend.onrender.com](https://resman-backend.onrender.com) | 🟢 Live on Render |
+| **Swagger API Docs** | [https://resman-backend.onrender.com/docs](https://resman-backend.onrender.com/docs) | 🟢 Interactive OpenAPI (or `/api/v1/docs`) |
+| **ReDoc API Docs** | [https://resman-backend.onrender.com/redoc](https://resman-backend.onrender.com/redoc) | 🟢 ReDoc Docs (or `/api/v1/redoc`) |
+
+> 📌 **Note on API Docs**: Swagger UI is accessible at [`/docs`](https://resman-backend.onrender.com/docs) or [`/api/v1/docs`](https://resman-backend.onrender.com/api/v1/docs). Interactive testing is enabled globally across development and production environments.
 
 ---
 
@@ -22,6 +33,87 @@
 **ResMan OS** is a **full-stack, production-ready restaurant management system** built for modern dine-in restaurants for **Vibeathon 6.0**. It digitises the entire restaurant workflow — starting when a customer scans the **Entrance QR Code** which lands them directly on the **Customer Page** (`/join`) to check in, get assigned a table or join the waitlist, browse the digital menu, and place orders — all the way to kitchen display execution, billing, Razorpay payments, floating notifications, and post-meal reviews in real time.
 
 No paper menus. No manual billing. No shouting across the floor.
+
+---
+
+## 🧪 How to Test (Complete End-to-End Workflow)
+
+You can test the entire real-time restaurant lifecycle on **one device (using multiple browser tabs side-by-side)** or **two devices (e.g., smartphone for customer + laptop for staff)**.
+
+### 📱 Testing Setup (Side-by-Side Tabs or Mobile + Laptop):
+- **Tab 1 (Customer Portal)**: [`https://resman-aqqx.vercel.app/join`](https://resman-aqqx.vercel.app/join)
+- **Tab 2 (Kitchen Display / KDS)**: [`https://resman-aqqx.vercel.app/kitchen/dashboard`](https://resman-aqqx.vercel.app/kitchen/dashboard)
+- **Tab 3 (Waiter Dashboard)**: [`https://resman-aqqx.vercel.app/waiter/dashboard`](https://resman-aqqx.vercel.app/waiter/dashboard)
+- **Tab 4 (Cleaning Dashboard)**: [`https://resman-aqqx.vercel.app/cleaning/dashboard`](https://resman-aqqx.vercel.app/cleaning/dashboard)
+- **Tab 5 (Cashier POS)**: [`https://resman-aqqx.vercel.app/cashier`](https://resman-aqqx.vercel.app/cashier)
+- **Tab 6 (Manager Hub)**: [`https://resman-aqqx.vercel.app/manager/dashboard`](https://resman-aqqx.vercel.app/manager/dashboard)
+
+---
+
+### 🔄 Total Workflow Lifecycle (10 Granular Steps)
+
+```mermaid
+flowchart TD
+    S1["1. Customer QR Check-in (/join)"] --> S2["2. Waiter Verifies Arrival (/waiter)"]
+    S2 --> S3["3. Browse & Place Order (/join/menu)"]
+    S3 --> S4["4. Kitchen KDS Prepares & Deducts Stock (/kitchen)"]
+    S4 --> S5["5. Real-time Toast Alert to Customer"]
+    S5 --> S6["6. Waiter Serves Food & Multi-Round Orders"]
+    S6 --> S7["7. Customer Requests Bill (/join/menu)"]
+    S7 --> S8["8. Payment: Razorpay Online or Cashier Cash (/billing)"]
+    S8 --> S9["9. Cleaning Queue & Auto-Next Waitlist Assignment"]
+    S9 --> S10["10. Verified Customer Dish Review (/reviews/submit)"]
+```
+
+#### **Step 1: Entrance QR Scan & Customer Check-In (`/join`)**
+1. Open [`/join`](https://resman-aqqx.vercel.app/join) on your phone or Tab 1.
+2. Enter a **Guest Name** (e.g., `Ayush`) and **Party Size** (e.g., `2`).
+3. Tap **Check In & Assign Table**. ResMan OS auto-assigns the best available table based on seating capacity, or automatically adds the guest to the **Waitlist Queue** if all tables are full.
+4. Tap **Proceed to Menu**.
+
+#### **Step 2: Waiter Dashboard Arrival Verification (`/waiter/dashboard`)**
+1. Switch to Tab 3: Open [`/waiter/dashboard`](https://resman-aqqx.vercel.app/waiter/dashboard).
+2. The waiter sees the newly assigned guest and table on the live table grid.
+3. Waiter verifies guest arrival and monitors table occupancy status.
+
+#### **Step 3: Browse Digital Menu & Place Order (`/join/menu`)**
+1. On Tab 1 (Customer Screen), filter menu by categories (*Mains, Drinks, Veg/Vegan*).
+2. Select items, add custom prep notes (e.g., *"Extra spicy, sauce on side"*), and add to cart.
+3. Open Cart and tap **Place Order**.
+4. Customer sees live status tracking: *Pending / Order Received*.
+
+#### **Step 4: Kitchen KDS Execution & Recipe Stock Deduction (`/kitchen/dashboard`)**
+1. Switch to Tab 2: Open [`/kitchen/dashboard`](https://resman-aqqx.vercel.app/kitchen/dashboard).
+2. The incoming order ticket appears live on the Kitchen Display System (KDS) with a 3-second auto-refresh.
+3. Kitchen staff updates order lifecycle: **Accept** ➔ **Preparing** ➔ **Food Ready**.
+4. *Automated Backend Action*: When kitchen accepts the order, ResMan OS automatically deducts ingredient quantities from inventory based on configured dish recipes.
+
+#### **Step 5: Instant Real-Time Status Toast Alert (Customer Screen)**
+1. **Look at Tab 1 (Customer Screen)**: Without refreshing the page, a top-floating notification toast pops up (*"Your food is ready!"*) and the order progress bar updates to 100%.
+
+#### **Step 6: Waiter Serving & Multi-Round Orders**
+1. Waiter marks items as **Served**.
+2. Customers can place multiple order rounds within the same dining session before requesting the bill.
+
+#### **Step 7: Request Consolidated Bill (`/join/menu`)**
+1. Once all ordered dishes are served, the **Request Bill** button activates on the Customer screen (Tab 1).
+2. Customer taps **Request Bill**, sending an instant alert to both Waiter and Cashier dashboards.
+
+#### **Step 8: Bill Settlement & Payment Options (`/billing/[billId]` or `/cashier`)**
+1. Customer taps **Pay Bill** to open the payment page.
+2. Select payment method:
+   - **Razorpay Online Payment**: Pay via UPI, Card, Net Banking (or test mode). Supports split bill calculation (equal, itemized, or custom).
+   - **Cash POS Settlement**: Cashier opens [`/cashier`](https://resman-aqqx.vercel.app/cashier) to process cash, enter change amounts, and mark bill settled.
+3. Upon successful payment, the session closes and the table state automatically changes to **Needs Cleaning**.
+
+#### **Step 9: Cleaning Queue & Auto-Assignment for Waitlist (`/cleaning/dashboard`)**
+1. Cleaning staff opens [`/cleaning/dashboard`](https://resman-aqqx.vercel.app/cleaning/dashboard).
+2. Tap **Mark Cleaned**.
+3. *Automated System Action*: The table status returns to **Available**. If guests are waiting in the waitlist queue, ResMan OS automatically assigns the newly cleaned table to the next waitlisted group!
+
+#### **Step 10: Verified Customer Dish Review & Executive Oversight (`/reviews/submit` & `/manager/dashboard`)**
+1. Post-payment, the customer is redirected to rate specific dishes ordered (`1-5 stars`) and provide feedback. Only verified, paid customers can review.
+2. Managers open [`/manager/dashboard`](https://resman-aqqx.vercel.app/manager/dashboard) or [`/reviews/manage`](https://resman-aqqx.vercel.app/reviews/manage) to view live CSAT ratings, revenue KPIs, recipe profitability margins, and respond to customer reviews.
 
 ---
 

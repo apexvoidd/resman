@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.v1.api import api_router
@@ -32,11 +33,24 @@ def create_app() -> FastAPI:
     """Application factory for FastAPI."""
     app = FastAPI(
         title=settings.APP_NAME,
-        openapi_url=f"{settings.API_V1_STR}/openapi.json" if settings.DEBUG else None,
-        docs_url=f"{settings.API_V1_STR}/docs" if settings.DEBUG else None,
-        redoc_url=f"{settings.API_V1_STR}/redoc" if settings.DEBUG else None,
+        openapi_url="/openapi.json",
+        docs_url="/docs",
+        redoc_url="/redoc",
         lifespan=lifespan,
     )
+
+    # Redirect /api/v1/docs and /api/v1/openapi.json to standard docs routes
+    @app.get("/api/v1/docs", include_in_schema=False)
+    async def redirect_api_v1_docs():
+        return RedirectResponse(url="/docs")
+
+    @app.get("/api/v1/openapi.json", include_in_schema=False)
+    async def redirect_api_v1_openapi():
+        return RedirectResponse(url="/openapi.json")
+
+    @app.get("/api/v1/redoc", include_in_schema=False)
+    async def redirect_api_v1_redoc():
+        return RedirectResponse(url="/redoc")
 
     # Trusted Hosts Middleware
     app.add_middleware(
