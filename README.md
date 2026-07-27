@@ -1,6 +1,6 @@
 # 🍽️ ResMan OS — Enterprise Restaurant Management System
 
-> **Vibethon 6.0** · Team **ApexVoid** · Solo Participant: **Ayush Kumar**
+> **Vibeathon 6.0** · Team **ApexVoid** · Solo Participant: **Ayush Kumar**
 
 
 
@@ -10,7 +10,7 @@
 
 | Field | Details |
 |---|---|
-| **Hackathon** | Vibethon 6.0 |
+| **Hackathon** | Vibeathon 6.0 |
 | **Team Name** | ApexVoid |
 | **Team Lead** | Ayush Kumar |
 | **Participation** | Solo |
@@ -19,7 +19,7 @@
 
 ## 🧠 What is ResMan OS?
 
-**ResMan OS** is a **full-stack, production-ready restaurant management system** built for modern dine-in restaurants. It digitises the entire restaurant workflow — from customer QR check-in to kitchen display, billing, Razorpay payments, floating top notifications, and post-meal reviews — all in real time.
+**ResMan OS** is a **full-stack, production-ready restaurant management system** built for modern dine-in restaurants for **Vibeathon 6.0**. It digitises the entire restaurant workflow — starting when a customer scans the **Entrance QR Code** which lands them directly on the **Customer Page** (`/join`) to check in, get assigned a table or join the waitlist, browse the digital menu, and place orders — all the way to kitchen display execution, billing, Razorpay payments, floating notifications, and post-meal reviews in real time.
 
 No paper menus. No manual billing. No shouting across the floor.
 
@@ -41,9 +41,9 @@ ResMan OS solves all of this in one unified system.
 ## ✨ Features
 
 ### 🧑‍💼 Customer Flow
-- **QR Code Check-in** — customers scan entrance QR, enter name + group size
-- **Smart Table Assignment** — auto-assigns the best-fit table by capacity
-- **Waitlist Queue** — joins queue if no table available, auto-assigned when one frees
+- **Entrance QR Scan & Landing** — Scanning the entrance QR code lands customers directly on the **Customer Page** (`/join`) for instant check-in.
+- **Smart Table Assignment** — Customers enter their name + group size, and the system auto-assigns the best-fit table by capacity.
+- **Waitlist Queue** — Automatically joins queue if no table is currently available, and auto-assigns when one frees up.
 - **Digital Menu** — browse, search, filter by category / vegetarian / vegan
 - **Cart & Ordering** — add items, special instructions, place multiple orders per session
 - **Top-Floating Popup Toast Notifications** — instant fixed top-center popups on mobile phones for order status updates (*Preparing*, *Food Ready*, *Served*), bill requests, Razorpay payment verification, and staff check-in alerts
@@ -301,7 +301,7 @@ The following features are present but marked **beta** — they work in basic fo
 
 | Page | URL | Role |
 |---|---|---|
-| Customer Check-in | `/join` | Public |
+| Customer Check-in (Entrance QR Landing) | `/join` | Public |
 | Customer Menu | `/join/menu` | Public |
 | Billing & Payment | `/billing/[billId]` | Public |
 | Leave a Review | `/reviews/submit` | Public (post-payment) |
@@ -323,6 +323,8 @@ The following features are present but marked **beta** — they work in basic fo
 
 ## 🏆 Hackathon Highlights
 
+- **Vibeathon 6.0 Project** — End-to-end digitised dine-in experience built for Vibeathon 6.0.
+- **Entrance QR Landing** — Scanning the entrance QR code lands guests directly on the Customer Page (`/join`) to check in and start ordering.
 - **End-to-end flow** — from customer QR scan to paid bill to review, zero manual intervention
 - **Real-time** — 3-second polling on all dashboards, instant notifications
 - **Multi-role** — 6 distinct staff roles, each with scoped access
@@ -332,10 +334,4 @@ The following features are present but marked **beta** — they work in basic fo
 
 ---
 
-## 📄 License
-
-Proprietary — All Rights Reserved (Team ApexVoid).
-
----
-
-*Built with ❤️ for Vibethon 6.0 by Ayush Kumar — ApexVoid*
+*Built with ❤️ for Vibeathon 6.0 by Ayush Kumar — ApexVoid*
