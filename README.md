@@ -40,13 +40,19 @@ No paper menus. No manual billing. No shouting across the floor.
 
 You can test the entire real-time restaurant lifecycle on **one device (using multiple browser tabs side-by-side)** or **two devices (e.g., smartphone for customer + laptop for staff)**.
 
+> [!IMPORTANT]
+> **Staff Authentication Requirement & Pro-Tip**:
+> - **Public Guest Access**: Customer check-in ([`/join`](https://resman-aqqx.vercel.app/join)), digital menu ([`/join/menu`](https://resman-aqqx.vercel.app/join/menu)), payment pages, and reviews do **not** require login.
+> - **Staff Role Access**: All staff dashboards ([`/waiter/dashboard`](https://resman-aqqx.vercel.app/waiter/dashboard), [`/kitchen/dashboard`](https://resman-aqqx.vercel.app/kitchen/dashboard), [`/cleaning/dashboard`](https://resman-aqqx.vercel.app/cleaning/dashboard), [`/cashier`](https://resman-aqqx.vercel.app/cashier), [`/manager/dashboard`](https://resman-aqqx.vercel.app/manager/dashboard), etc.) require signing in via [`/sign-in`](https://resman-aqqx.vercel.app/sign-in) with an account assigned to the appropriate staff role.
+> - 💡 **Testing Shortcut (Recommended)**: For seamless testing across all staff dashboards simultaneously, **sign in with an `admin` or `manager` account**. Admin and Manager roles have master access to ALL staff dashboards (Waiter, Kitchen KDS, Cashier POS, Cleaning Queue, Inventory, Manager Hub), so you can operate every POS/dashboard without switching accounts!
+
 ### 📱 Testing Setup (Side-by-Side Tabs or Mobile + Laptop):
-- **Tab 1 (Customer Portal)**: [`https://resman-aqqx.vercel.app/join`](https://resman-aqqx.vercel.app/join)
-- **Tab 2 (Kitchen Display / KDS)**: [`https://resman-aqqx.vercel.app/kitchen/dashboard`](https://resman-aqqx.vercel.app/kitchen/dashboard)
-- **Tab 3 (Waiter Dashboard)**: [`https://resman-aqqx.vercel.app/waiter/dashboard`](https://resman-aqqx.vercel.app/waiter/dashboard)
-- **Tab 4 (Cleaning Dashboard)**: [`https://resman-aqqx.vercel.app/cleaning/dashboard`](https://resman-aqqx.vercel.app/cleaning/dashboard)
-- **Tab 5 (Cashier POS)**: [`https://resman-aqqx.vercel.app/cashier`](https://resman-aqqx.vercel.app/cashier)
-- **Tab 6 (Manager Hub)**: [`https://resman-aqqx.vercel.app/manager/dashboard`](https://resman-aqqx.vercel.app/manager/dashboard)
+- **Tab 1 (Customer Portal)**: [`https://resman-aqqx.vercel.app/join`](https://resman-aqqx.vercel.app/join) *(Public - No login required)*
+- **Tab 2 (Kitchen Display / KDS)**: [`https://resman-aqqx.vercel.app/kitchen/dashboard`](https://resman-aqqx.vercel.app/kitchen/dashboard) *(Requires Staff Login)*
+- **Tab 3 (Waiter Dashboard)**: [`https://resman-aqqx.vercel.app/waiter/dashboard`](https://resman-aqqx.vercel.app/waiter/dashboard) *(Requires Staff Login)*
+- **Tab 4 (Cleaning Dashboard)**: [`https://resman-aqqx.vercel.app/cleaning/dashboard`](https://resman-aqqx.vercel.app/cleaning/dashboard) *(Requires Staff Login)*
+- **Tab 5 (Cashier POS)**: [`https://resman-aqqx.vercel.app/cashier`](https://resman-aqqx.vercel.app/cashier) *(Requires Staff Login)*
+- **Tab 6 (Manager Hub)**: [`https://resman-aqqx.vercel.app/manager/dashboard`](https://resman-aqqx.vercel.app/manager/dashboard) *(Requires Staff Login)*
 
 ---
 
