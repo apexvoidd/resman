@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/apexvoidd/resman/actions/workflows/ci.yml/badge.svg)](https://github.com/apexvoidd/resman/actions)
 ![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20Next.js-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-Proprietary-red)
 
 ---
 
@@ -291,6 +291,7 @@ The following features are present but marked **beta** — they work in basic fo
 
 | Feature | Status | Notes |
 |---|---|---|
+| **Split Bill** | 🟡 Beta | Equal, itemized, and custom split calculation supported with Razorpay & Cash settlements. |
 | **Staff Role-Based Nav** | 🟡 Beta | `RouteGuard`, `AppLayout`, `Navbar` components exist but not fully wired to every page. |
 | **Loyalty / Rewards** | ❌ Not Implemented | Models exist in DB schema, no UI or service logic built. |
 | **Customer Accounts** | ❌ Not Implemented | Guests can order without accounts. Registered customer profiles exist in DB but no registration flow. |
@@ -335,7 +336,7 @@ The following features are present but marked **beta** — they work in basic fo
 
 ## 📄 License
 
-MIT — free to use, modify, and distribute.
+Proprietary — All Rights Reserved (Team ApexVoid).
 
 ---
 
