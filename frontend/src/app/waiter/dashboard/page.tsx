@@ -1,7 +1,7 @@
 "use client";
 
 import { RouteGuard } from "@/components/RouteGuard";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 import {
@@ -15,7 +15,7 @@ import {
 import Link from "next/link";
 import { clearAllNotifications, dismissNotification, fetchWaiterNotifications, generateBill, WaiterNotification } from "@/services/billing";
 import { toggleTableStatus, TableStatusType } from "@/services/table";
-import { fetchKDSOrders, fetchWaiterOrders } from "@/services/kds";
+import { fetchWaiterOrders } from "@/services/kds";
 import { OrderOut } from "@/services/order";
 import { useToast } from "@/context/ToastContext";
 
@@ -51,7 +51,7 @@ function WaiterDashboardPage() {
 
   const isStaffAuthorized = hasRole("waiter") || hasRole("manager") || hasRole("admin");
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const token = await getToken();
       if (!token) return;
@@ -74,7 +74,7 @@ function WaiterDashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getToken]);
 
   const handleDismissNotification = async (notificationId: string) => {
     const token = await getToken();
@@ -137,7 +137,7 @@ function WaiterDashboardPage() {
   useEffect(() => {
     if (isLoading || !isStaffAuthorized) return;
 
-    loadData();
+    Promise.resolve().then(() => loadData());
 
     // Live Polling every 3 seconds for instant updates
     const interval = setInterval(() => {
@@ -145,7 +145,7 @@ function WaiterDashboardPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isLoading, isStaffAuthorized]);
+  }, [isLoading, isStaffAuthorized, loadData]);
 
   const handleConfirmArrival = async (tableId: string) => {
     try {

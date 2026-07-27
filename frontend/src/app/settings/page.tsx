@@ -23,7 +23,6 @@ import {
   Building2,
   Clock,
   Coins,
-  FileText,
   Upload,
   CheckCircle2,
   AlertCircle,
@@ -137,7 +136,7 @@ function SettingsPage() {
       const token = await getToken();
       if (!token) throw new Error("Unauthenticated");
 
-      const res = await uploadLogo(token, file);
+      await uploadLogo(token, file);
       queryClient.invalidateQueries({ queryKey: ["restaurant-settings"] });
       setMessage({
         type: "success",

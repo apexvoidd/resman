@@ -1,7 +1,7 @@
 "use client";
 
 import { RouteGuard } from "@/components/RouteGuard";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 import {
@@ -42,7 +42,7 @@ function KitchenDashboardPage() {
     hasRole("kitchen", "kitchen_staff", "chef", "manager", "admin");
   const isManager = hasRole("manager") || hasRole("admin");
 
-  const loadKDSData = async () => {
+  const loadKDSData = useCallback(async () => {
     try {
       const token = await getToken();
       if (!token) return;
@@ -61,12 +61,12 @@ function KitchenDashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getToken, search, statusFilter, sortBy]);
 
   useEffect(() => {
     if (isLoading || !isAuthorized) return;
 
-    loadKDSData();
+    Promise.resolve().then(() => loadKDSData());
 
     // 3-second live polling
     const interval = setInterval(() => {
@@ -74,7 +74,7 @@ function KitchenDashboardPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isLoading, isAuthorized, search, statusFilter, sortBy]);
+  }, [isLoading, isAuthorized, loadKDSData]);
 
   const handleAccept = async (e: React.FormEvent) => {
     e.preventDefault();

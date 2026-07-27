@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 import { RouteGuard } from "@/components/RouteGuard";
@@ -35,7 +35,7 @@ export default function ManagerDashboardPage() {
   const [broadcastPriority, setBroadcastPriority] = useState<string>("urgent");
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
-  const loadManagerData = async (isSilent = false) => {
+  const loadManagerData = useCallback(async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
       setErrorMsg(null);
@@ -48,23 +48,23 @@ export default function ManagerDashboardPage() {
 
       setOverview(ovData);
       setRecipes(recData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      if (!isSilent) setErrorMsg(err.message || "Failed to load manager dashboard metrics.");
+      if (!isSilent) setErrorMsg((err as Error).message || "Failed to load manager dashboard metrics.");
     } finally {
       if (!isSilent) setLoading(false);
     }
-  };
+  }, [getToken]);
 
   useEffect(() => {
     if (!rbacLoading && isAuthorized) {
-      loadManagerData(false);
+      Promise.resolve().then(() => loadManagerData(false));
       const interval = setInterval(() => {
         loadManagerData(true);
       }, 3000);
       return () => clearInterval(interval);
     }
-  }, [rbacLoading, isAuthorized]);
+  }, [rbacLoading, isAuthorized, loadManagerData]);
 
   const handleSendBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,8 +85,8 @@ export default function ManagerDashboardPage() {
       setShowBroadcastModal(false);
       setBroadcastTitle("");
       setBroadcastMsg("");
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to send broadcast announcement.");
+    } catch (err: unknown) {
+      setErrorMsg((err as Error).message || "Failed to send broadcast announcement.");
     } finally {
       setActionLoading(false);
     }
@@ -100,8 +100,8 @@ export default function ManagerDashboardPage() {
       const res = await bulkResetTables(token);
       setSuccessMsg(res.message);
       loadManagerData();
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to reset tables.");
+    } catch (err: unknown) {
+      setErrorMsg((err as Error).message || "Failed to reset tables.");
     } finally {
       setActionLoading(false);
     }
@@ -216,7 +216,7 @@ export default function ManagerDashboardPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-                    Today's Revenue
+                    Today&apos;s Revenue
                   </p>
                   <h3 className="text-2xl font-extrabold text-white mt-1">
                     ₹{overview?.today_revenue.toFixed(2) ?? "0.00"}
@@ -297,7 +297,7 @@ export default function ManagerDashboardPage() {
                 </div>
               </div>
               <p className="text-[11px] text-slate-400 mt-3">
-                Today's Waste Cost: <span className="font-semibold text-rose-400">₹{overview?.today_waste_cost.toFixed(2) ?? "0.00"}</span>
+                Today&apos;s Waste Cost: <span className="font-semibold text-rose-400">₹{overview?.today_waste_cost.toFixed(2) ?? "0.00"}</span>
               </p>
             </div>
           </div>

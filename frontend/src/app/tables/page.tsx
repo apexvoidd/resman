@@ -29,7 +29,6 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
-  Shield,
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 import { RouteGuard } from "@/components/RouteGuard";
@@ -33,7 +33,7 @@ interface Bill {
   items: BillItem[];
 }
 
-  function CashierPOSPage() {
+export default function CashierPOSPage() {
   const { getToken } = useAuth();
   const { isLoading: rbacLoading, hasRole } = useRBAC();
   const toast = useToast();
@@ -56,7 +56,7 @@ interface Bill {
   const [notes, setNotes] = useState<string>("");
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
-  const loadBills = async (isSilent = false) => {
+  const loadBills = useCallback(async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
       setErrorMsg(null);
@@ -72,23 +72,23 @@ interface Bill {
       }
       const data = await res.json();
       setBills(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      if (!isSilent) setErrorMsg(err.message || "Failed to load billing records.");
+      if (!isSilent) setErrorMsg((err as Error).message || "Failed to load billing records.");
     } finally {
       if (!isSilent) setLoading(false);
     }
-  };
+  }, [getToken]);
 
   useEffect(() => {
     if (!rbacLoading && isAuthorized) {
-      loadBills(false);
+      Promise.resolve().then(() => loadBills(false));
       const interval = setInterval(() => {
         loadBills(true);
       }, 3000);
       return () => clearInterval(interval);
     }
-  }, [rbacLoading, isAuthorized]);
+  }, [rbacLoading, isAuthorized, loadBills]);
 
   const handleOpenSettlement = (bill: Bill) => {
     setSelectedBill(bill);
@@ -139,8 +139,8 @@ interface Bill {
       toast.success(msg, "Bill Settled");
       setSelectedBill(null);
       loadBills();
-    } catch (err: any) {
-      const msg = err.message || "Settlement failed.";
+    } catch (err: unknown) {
+      const msg = (err as Error).message || "Settlement failed.";
       setErrorMsg(msg);
       toast.error(msg, "Settlement Failed");
     } finally {

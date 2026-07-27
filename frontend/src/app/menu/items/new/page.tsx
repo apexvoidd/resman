@@ -62,7 +62,7 @@ function AddMenuItemPage() {
     if (!isLoading && isStaffAuthorized) {
       load();
     }
-  }, [isLoading, isStaffAuthorized]);
+  }, [isLoading, isStaffAuthorized, getToken]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

@@ -1,7 +1,7 @@
 "use client";
 
 import { RouteGuard } from "@/components/RouteGuard";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 import { fetchIngredients, IngredientOut } from "@/services/inventory";
@@ -46,7 +46,7 @@ function RecipesPage() {
     { ingredient_id: "", quantity: 100, unit_of_measure: "g" },
   ]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const token = await getToken();
@@ -70,12 +70,12 @@ function RecipesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getToken]);
 
   useEffect(() => {
     if (isLoading || !isAuthorized) return;
-    loadData();
-  }, [isLoading, isAuthorized]);
+    Promise.resolve().then(() => loadData());
+  }, [isLoading, isAuthorized, loadData]);
 
   const openAddModal = () => {
     const firstItem = menuItems[0];
@@ -87,7 +87,7 @@ function RecipesPage() {
       {
         ingredient_id: availableIngredients[0]?.id || "",
         quantity: 100,
-        unit_of_measure: (availableIngredients[0]?.unit_of_measure as any) || "g",
+        unit_of_measure: (availableIngredients[0]?.unit_of_measure as unknown as RecipeIngredientInput["unit_of_measure"]) || "g",
       },
     ]);
     setShowModal(true);
@@ -102,7 +102,7 @@ function RecipesPage() {
       rec.ingredients.map((ri) => ({
         ingredient_id: ri.ingredient_id,
         quantity: ri.quantity,
-        unit_of_measure: (ri.unit_of_measure as any) || "g",
+        unit_of_measure: (ri.unit_of_measure as unknown as RecipeIngredientInput["unit_of_measure"]) || "g",
       }))
     );
     setShowModal(true);
@@ -113,7 +113,7 @@ function RecipesPage() {
       (ing) => !recipeIngredients.some((ri) => ri.ingredient_id === ing.id)
     );
     const ingId = unselected?.id || availableIngredients[0]?.id || "";
-    const unit = (unselected?.unit_of_measure as any) || "g";
+    const unit = (unselected?.unit_of_measure as unknown as RecipeIngredientInput["unit_of_measure"]) || "g";
 
     setRecipeIngredients([
       ...recipeIngredients,
@@ -132,15 +132,15 @@ function RecipesPage() {
   const handleIngredientChange = (
     index: number,
     field: keyof RecipeIngredientInput,
-    value: any
+    value: unknown
   ) => {
     const updated = [...recipeIngredients];
     if (field === "ingredient_id") {
       const targetIng = availableIngredients.find((i) => i.id === value);
       updated[index] = {
         ...updated[index],
-        ingredient_id: value,
-        unit_of_measure: (targetIng?.unit_of_measure as any) || updated[index].unit_of_measure,
+        ingredient_id: value as string,
+        unit_of_measure: (targetIng?.unit_of_measure as unknown as RecipeIngredientInput["unit_of_measure"]) || updated[index].unit_of_measure,
       };
     } else {
       updated[index] = { ...updated[index], [field]: value };
@@ -301,7 +301,7 @@ function RecipesPage() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredRecipes.length === 0 ? (
             <div className="col-span-full rounded-2xl border border-gray-800 bg-gray-900 p-12 text-center text-sm text-gray-500">
-              No recipes configured yet. Click "+ Create New Recipe" to attach ingredients to menu items!
+              No recipes configured yet. Click &quot;+ Create New Recipe&quot; to attach ingredients to menu items!
             </div>
           ) : (
             filteredRecipes.map((rec) => (
@@ -506,7 +506,7 @@ function RecipesPage() {
 
                       <select
                         value={ri.unit_of_measure}
-                        onChange={(e) => handleIngredientChange(index, "unit_of_measure", e.target.value as any)}
+                        onChange={(e) => handleIngredientChange(index, "unit_of_measure", e.target.value as unknown as RecipeIngredientInput["unit_of_measure"])}
                         className="w-1/4 rounded-lg bg-gray-900 px-3 py-1.5 text-white ring-1 ring-white/10 focus:outline-none"
                       >
                         <option value="kg">kg</option>

@@ -26,9 +26,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    if (mobileOpen) setMobileOpen(false);
+  }
 
   if (
     pathname === "/" ||

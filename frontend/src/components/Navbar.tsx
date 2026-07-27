@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 
 export function Navbar() {
   const { isSignedIn, isLoaded } = useUser();
-  const { hasRole, hasPermission, roles, isSuperadmin, designatedDashboard } = useRBAC();
+  const { hasRole, roles, isSuperadmin, designatedDashboard } = useRBAC();
   const pathname = usePathname();
 
   // Hide nav bar entirely on guest entrance / join pages for customer experience
