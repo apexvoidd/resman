@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/context/ToastContext";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -15,6 +16,7 @@ interface ReviewDraft {
   menu_item_name: string;
   rating: number;
   comment: string;
+  display_name?: string;
 }
 
 async function fetchOrderedItems(sessionToken: string): Promise<OrderedItem[]> {
@@ -48,6 +50,7 @@ async function submitReview(sessionToken: string, draft: ReviewDraft): Promise<v
       menu_item_id: draft.menu_item_id,
       rating: draft.rating,
       comment: draft.comment.trim() || null,
+      display_name: draft.display_name?.trim() || null,
     }),
   });
   if (!res.ok) {
@@ -77,6 +80,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
 }
 
 export default function ReviewSubmitPage() {
+  const toast = useToast();
   const router = useRouter();
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [items, setItems] = useState<OrderedItem[]>([]);
@@ -104,14 +108,22 @@ export default function ReviewSubmitPage() {
   const handleSubmit = async (menuItemId: string) => {
     if (!sessionToken) return;
     const draft = drafts[menuItemId];
-    if (!draft || draft.rating === 0) { setErrorMsg("Please select a star rating."); return; }
+    if (!draft || draft.rating === 0) {
+      const msg = "Please select a star rating.";
+      setErrorMsg(msg);
+      toast.warning(msg, "Rating Required");
+      return;
+    }
     try {
       setSubmitting(menuItemId);
       setErrorMsg(null);
       await submitReview(sessionToken, { ...draft, display_name: displayName } as ReviewDraft);
       setSubmitted((prev) => new Set([...prev, menuItemId]));
+      toast.success(`⭐ Review for ${draft.menu_item_name} submitted!`, "Thank You");
     } catch (err: unknown) {
-      setErrorMsg((err as Error).message);
+      const msg = (err as Error).message;
+      setErrorMsg(msg);
+      toast.error(msg, "Review Submission Error");
     } finally {
       setSubmitting(null);
     }

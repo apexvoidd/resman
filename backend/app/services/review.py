@@ -50,7 +50,7 @@ async def submit_review(
 ) -> ReviewOut:
     """
     Submit a review for a menu item.
-    Requires: active guest session with can_submit_review=True (set after bill paid).
+    Requires: active guest session with orders or completed dining session.
     One review per menu item per session.
     """
     # 1. Validate session
@@ -60,11 +60,23 @@ async def submit_review(
     session = sess_res.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+
     if not session.can_submit_review:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Reviews can only be submitted after a completed and paid dining session.",
+        # Check if session has any non-cancelled orders
+        ord_res = await db.execute(
+            select(Order).where(
+                Order.guest_session_id == session.id,
+                Order.status != "cancelled",
+                Order.deleted_at.is_(None),
+            )
         )
+        if ord_res.scalars().first():
+            session.can_submit_review = True
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Reviews can only be submitted after ordering food during a dining session.",
+            )
 
     # 2. Check menu item exists
     item_res = await db.execute(
@@ -74,7 +86,7 @@ async def submit_review(
     if not menu_item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Menu item not found.")
 
-    # 3. Verify the item was actually ordered in this session
+    # 3. Verify the item was actually ordered in this session (or at session table)
     ordered_res = await db.execute(
         select(OrderItem)
         .join(Order, Order.id == OrderItem.order_id)
@@ -82,13 +94,32 @@ async def submit_review(
             Order.guest_session_id == session.id,
             OrderItem.menu_item_id == payload.menu_item_id,
             Order.deleted_at.is_(None),
+            Order.status != "cancelled",
         )
     )
-    if not ordered_res.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You can only review items you actually ordered.",
-        )
+    if not ordered_res.scalars().first():
+        # Fallback: check table orders if session has table_id
+        if session.table_id:
+            tbl_ordered_res = await db.execute(
+                select(OrderItem)
+                .join(Order, Order.id == OrderItem.order_id)
+                .where(
+                    Order.table_id == session.table_id,
+                    OrderItem.menu_item_id == payload.menu_item_id,
+                    Order.deleted_at.is_(None),
+                    Order.status != "cancelled",
+                )
+            )
+            if not tbl_ordered_res.scalars().first():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="You can only review items ordered during your dining session.",
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You can only review items ordered during your dining session.",
+            )
 
     # 4. Prevent duplicate review for same item in same session
     dup_res = await db.execute(
@@ -98,17 +129,24 @@ async def submit_review(
             Review.deleted_at.is_(None),
         )
     )
-    if dup_res.scalar_one_or_none():
+    if dup_res.scalars().first():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="You have already reviewed this item for this dining session.",
+            detail="You have already submitted a review for this dish.",
         )
 
-    # 5. Get branch
-    branch_res = await db.execute(
-        select(Branch).where(Branch.id == session.branch_id)
-    )
-    branch = branch_res.scalar_one_or_none()
+    # 5. Get branch with fallback
+    branch = None
+    if session.branch_id:
+        branch_res = await db.execute(
+            select(Branch).where(Branch.id == session.branch_id, Branch.deleted_at.is_(None))
+        )
+        branch = branch_res.scalar_one_or_none()
+    if not branch:
+        branch_res = await db.execute(
+            select(Branch).where(Branch.deleted_at.is_(None)).limit(1)
+        )
+        branch = branch_res.scalar_one_or_none()
     if not branch:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Branch not found.")
 
