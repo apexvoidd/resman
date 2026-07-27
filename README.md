@@ -1,4 +1,4 @@
-# 🍽️ ResMan OS — AI-Powered Restaurant Management System
+# 🍽️ ResMan OS — Enterprise Restaurant Management System
 
 > **Vibethon 6.0** · Team **ApexVoid** · Solo Participant: **Ayush Kumar**
 
