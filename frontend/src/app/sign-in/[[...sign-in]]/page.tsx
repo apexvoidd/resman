@@ -94,53 +94,113 @@ export default function SignInPage() {
             )}
           </div>
 
-          <div className="space-y-3 text-xs">
+          <div className="space-y-2 text-xs max-h-[360px] overflow-y-auto pr-1">
+            {/* Admin LE */}
             <div
               onClick={() => copyToClipboard("admin@restaurant.com", "Admin Email")}
-              className="p-3 bg-slate-950 hover:bg-slate-900/80 cursor-pointer transition rounded-xl border border-slate-800 space-y-1 group"
+              className="p-2.5 bg-slate-950 hover:bg-slate-900/80 cursor-pointer transition rounded-xl border border-slate-800 space-y-0.5 group"
             >
               <div className="flex justify-between items-center font-bold text-sky-400">
-                <span>👔 Manager / Admin</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-5 w-5 rounded bg-sky-500/20 text-sky-300 text-[10px] flex items-center justify-center font-mono font-bold">AL</span>
+                  <span>Admin LE</span>
+                  <span className="text-[9px] bg-sky-500/10 px-1.5 py-0.2 text-sky-300 rounded border border-sky-500/20 font-normal">Admin</span>
+                </span>
                 <span className="text-[10px] bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20 group-hover:bg-sky-500/20">
-                  Tap to Copy
+                  Copy
                 </span>
               </div>
               <p className="text-slate-200 font-mono text-[11px]">admin@restaurant.com</p>
-              <p className="text-slate-400 text-[10px]">
-                Password: <code className="text-slate-200 font-mono">Hackathon2026!</code>
-              </p>
             </div>
 
+            {/* Manager Meow */}
             <div
-              onClick={() => copyToClipboard("cashier@restaurant.com", "Cashier Email")}
-              className="p-3 bg-slate-950 hover:bg-slate-900/80 cursor-pointer transition rounded-xl border border-slate-800 space-y-1 group"
+              onClick={() => copyToClipboard("manager@restaurant.com", "Manager Email")}
+              className="p-2.5 bg-slate-950 hover:bg-slate-900/80 cursor-pointer transition rounded-xl border border-slate-800 space-y-0.5 group"
             >
-              <div className="flex justify-between items-center font-bold text-emerald-400">
-                <span>💵 Cashier</span>
-                <span className="text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 group-hover:bg-emerald-500/20">
-                  Tap to Copy
+              <div className="flex justify-between items-center font-bold text-indigo-400">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-5 w-5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] flex items-center justify-center font-mono font-bold">MM</span>
+                  <span>Manager Meow</span>
+                  <span className="text-[9px] bg-indigo-500/10 px-1.5 py-0.2 text-indigo-300 rounded border border-indigo-500/20 font-normal">Manager</span>
+                </span>
+                <span className="text-[10px] bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 group-hover:bg-indigo-500/20">
+                  Copy
                 </span>
               </div>
-              <p className="text-slate-200 font-mono text-[11px]">cashier@restaurant.com</p>
-              <p className="text-slate-400 text-[10px]">
-                Password: <code className="text-slate-200 font-mono">Hackathon2026!</code>
-              </p>
+              <p className="text-slate-200 font-mono text-[11px]">manager@restaurant.com</p>
             </div>
 
+            {/* Waiter Walter Jr. */}
             <div
-              onClick={() => copyToClipboard("kitchen@restaurant.com", "Kitchen Email")}
-              className="p-3 bg-slate-950 hover:bg-slate-900/80 cursor-pointer transition rounded-xl border border-slate-800 space-y-1 group"
+              onClick={() => copyToClipboard("waiter@restaurant.com", "Waiter Email")}
+              className="p-2.5 bg-slate-950 hover:bg-slate-900/80 cursor-pointer transition rounded-xl border border-slate-800 space-y-0.5 group"
             >
               <div className="flex justify-between items-center font-bold text-amber-400">
-                <span>📋 Waiter / 🍳 Kitchen</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-5 w-5 rounded bg-amber-500/20 text-amber-300 text-[10px] flex items-center justify-center font-mono font-bold">WW</span>
+                  <span>Waiter Walter Jr.</span>
+                  <span className="text-[9px] bg-amber-500/10 px-1.5 py-0.2 text-amber-300 rounded border border-amber-500/20 font-normal">Waiter</span>
+                </span>
                 <span className="text-[10px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 group-hover:bg-amber-500/20">
-                  Tap to Copy
+                  Copy
+                </span>
+              </div>
+              <p className="text-slate-200 font-mono text-[11px]">waiter@restaurant.com</p>
+            </div>
+
+            {/* Kitchen Cook */}
+            <div
+              onClick={() => copyToClipboard("kitchen@restaurant.com", "Kitchen Email")}
+              className="p-2.5 bg-slate-950 hover:bg-slate-900/80 cursor-pointer transition rounded-xl border border-slate-800 space-y-0.5 group"
+            >
+              <div className="flex justify-between items-center font-bold text-orange-400">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-5 w-5 rounded bg-orange-500/20 text-orange-300 text-[10px] flex items-center justify-center font-mono font-bold">KC</span>
+                  <span>Kitchen Cook</span>
+                  <span className="text-[9px] bg-orange-500/10 px-1.5 py-0.2 text-orange-300 rounded border border-orange-500/20 font-normal">Kitchen</span>
+                </span>
+                <span className="text-[10px] bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20 group-hover:bg-orange-500/20">
+                  Copy
                 </span>
               </div>
               <p className="text-slate-200 font-mono text-[11px]">kitchen@restaurant.com</p>
-              <p className="text-slate-400 text-[10px]">
-                Password: <code className="text-slate-200 font-mono">Hackathon2026!</code>
-              </p>
+            </div>
+
+            {/* Cashier from columbia */}
+            <div
+              onClick={() => copyToClipboard("cashier@restaurant.com", "Cashier Email")}
+              className="p-2.5 bg-slate-950 hover:bg-slate-900/80 cursor-pointer transition rounded-xl border border-slate-800 space-y-0.5 group"
+            >
+              <div className="flex justify-between items-center font-bold text-emerald-400">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-5 w-5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] flex items-center justify-center font-mono font-bold">CF</span>
+                  <span>Cashier from columbia</span>
+                  <span className="text-[9px] bg-emerald-500/10 px-1.5 py-0.2 text-emerald-300 rounded border border-emerald-500/20 font-normal">Cashier</span>
+                </span>
+                <span className="text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 group-hover:bg-emerald-500/20">
+                  Copy
+                </span>
+              </div>
+              <p className="text-slate-200 font-mono text-[11px]">cashier@restaurant.com</p>
+            </div>
+
+            {/* Cleaning Levi */}
+            <div
+              onClick={() => copyToClipboard("cleaner@restaurant.com", "Cleaner Email")}
+              className="p-2.5 bg-slate-950 hover:bg-slate-900/80 cursor-pointer transition rounded-xl border border-slate-800 space-y-0.5 group"
+            >
+              <div className="flex justify-between items-center font-bold text-purple-400">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-5 w-5 rounded bg-purple-500/20 text-purple-300 text-[10px] flex items-center justify-center font-mono font-bold">CL</span>
+                  <span>Cleaning Levi</span>
+                  <span className="text-[9px] bg-purple-500/10 px-1.5 py-0.2 text-purple-300 rounded border border-purple-500/20 font-normal">Cleaner</span>
+                </span>
+                <span className="text-[10px] bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 group-hover:bg-purple-500/20">
+                  Copy
+                </span>
+              </div>
+              <p className="text-slate-200 font-mono text-[11px]">cleaner@restaurant.com</p>
             </div>
           </div>
 
