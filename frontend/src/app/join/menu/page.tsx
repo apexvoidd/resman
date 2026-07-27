@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { fetchGuestStatus, GuestStatusResponse } from "@/services/guest";
 import { Category, fetchCategories, fetchMenuItems, MenuItem } from "@/services/menu";
-import { cancelOrder, fetchSessionOrders, OrderOut, placeOrder } from "@/services/order";
+import { cancelOrder, fetchSessionOrders, OrderOut, placeOrder, updateOrder } from "@/services/order";
 import { useCartStore } from "@/store/use-cart-store";
 import { fetchSessionBill, requestBill, BillData } from "@/services/billing";
 import { getSafeImageUrl } from "@/lib/utils";
@@ -20,45 +20,14 @@ export default function CustomerSeatedMenuPage() {
   const [activeBill, setActiveBill] = useState<BillData | null>(null);
   const prevOrdersRef = useRef<Record<string, string>>({});
 
-  const [sessionOrders, setSessionOrders] = useState<OrderOut[]>([]);
-
-  const checkBill = useCallback(async (st: string) => {
+  const checkBill = async (st: string) => {
     try {
       const b = await fetchSessionBill(st);
       if (b) setActiveBill(b);
     } catch {
       // silent catch
     }
-  }, []);
-
-  const loadSessionOrders = useCallback(async () => {
-    if (!sessionToken) return;
-    try {
-      const data = await fetchSessionOrders(sessionToken);
-
-      // Trigger floating popup toast for order status updates
-      data.forEach((ord) => {
-        const prevStatus = prevOrdersRef.current[ord.id];
-        if (prevStatus && prevStatus !== ord.status) {
-          if (ord.status === "ready") {
-            toast.success(`🍽️ Order #${ord.order_number} is READY! Waiter will bring your food shortly.`, "Kitchen Update", 7000);
-          } else if (ord.status === "preparing") {
-            toast.info(`🔥 Kitchen started preparing Order #${ord.order_number}.`, "Kitchen Update", 5000);
-          } else if (ord.status === "cancelled") {
-            toast.warning(`❌ Order #${ord.order_number} was cancelled.`, "Order Status Update", 6000);
-          } else if (ord.status === "served" || ord.status === "completed") {
-            toast.success(`✨ Order #${ord.order_number} has been served! Enjoy your meal.`, "Order Served", 6000);
-          }
-        }
-        prevOrdersRef.current[ord.id] = ord.status;
-      });
-
-      setSessionOrders(data);
-    } catch (err: unknown) {
-      const e = err as Error;
-      setErrorMsg(e.message || "Failed to load session orders.");
-    }
-  }, [sessionToken, toast]);
+  };
 
   const handleRequestBill = async () => {
     if (!sessionToken) return;
@@ -100,6 +69,10 @@ export default function CustomerSeatedMenuPage() {
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [sessionOrders, setSessionOrders] = useState<OrderOut[]>([]);
+
+  // Editing order state
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
   // 1. Initialize and verify arrival access
   useEffect(() => {
@@ -137,15 +110,13 @@ export default function CustomerSeatedMenuPage() {
     }
 
     init();
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     if (!sessionToken) return;
 
-    Promise.resolve().then(() => {
-      checkBill(sessionToken);
-      loadSessionOrders();
-    });
+    checkBill(sessionToken);
+    loadSessionOrders();
 
     const interval = setInterval(() => {
       checkBill(sessionToken);
@@ -153,7 +124,7 @@ export default function CustomerSeatedMenuPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [sessionToken, checkBill, loadSessionOrders]);
+  }, [sessionToken]);
 
   // Filter items
   const filteredItems = items.filter((dish) => {
@@ -165,6 +136,35 @@ export default function CustomerSeatedMenuPage() {
     }
     return true;
   });
+
+  const loadSessionOrders = async () => {
+    if (!sessionToken) return;
+    try {
+      const data = await fetchSessionOrders(sessionToken);
+
+      // Trigger floating popup toast for order status updates
+      data.forEach((ord) => {
+        const prevStatus = prevOrdersRef.current[ord.id];
+        if (prevStatus && prevStatus !== ord.status) {
+          if (ord.status === "ready") {
+            toast.success(`🍽️ Order #${ord.order_number} is READY! Waiter will bring your food shortly.`, "Kitchen Update", 7000);
+          } else if (ord.status === "preparing") {
+            toast.info(`🔥 Kitchen started preparing Order #${ord.order_number}.`, "Kitchen Update", 5000);
+          } else if (ord.status === "cancelled") {
+            toast.warning(`❌ Order #${ord.order_number} was cancelled.`, "Order Status Update", 6000);
+          } else if (ord.status === "served" || ord.status === "completed") {
+            toast.success(`✨ Order #${ord.order_number} has been served! Enjoy your meal.`, "Order Served", 6000);
+          }
+        }
+        prevOrdersRef.current[ord.id] = ord.status;
+      });
+
+      setSessionOrders(data);
+    } catch (err: unknown) {
+      const e = err as Error;
+      setErrorMsg(e.message || "Failed to load session orders.");
+    }
+  };
 
   const handlePlaceOrder = async () => {
     if (!sessionToken || cartItems.length === 0) return;

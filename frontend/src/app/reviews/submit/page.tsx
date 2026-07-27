@@ -92,34 +92,17 @@ export default function ReviewSubmitPage() {
   const [displayName, setDisplayName] = useState("");
 
   useEffect(() => {
-    let isMounted = true;
-    const loadItems = async () => {
-      const token = typeof window !== "undefined" ? localStorage.getItem("guest_session_token") : null;
-      if (!token) {
-        if (isMounted) setLoading(false);
-        return;
-      }
-      if (isMounted) setSessionToken(token);
-      try {
-        const data = await fetchOrderedItems(token);
-        if (!isMounted) return;
-        setItems(data);
-        const initial: Record<string, ReviewDraft> = {};
-        data.forEach((i) => {
-          initial[i.menu_item_id] = { menu_item_id: i.menu_item_id, menu_item_name: i.menu_item_name, rating: 0, comment: "" };
-        });
-        setDrafts(initial);
-      } catch {
-        // silent catch
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    loadItems();
-    return () => {
-      isMounted = false;
-    };
+    const token = localStorage.getItem("guest_session_token");
+    if (!token) { setLoading(false); return; }
+    setSessionToken(token);
+    fetchOrderedItems(token).then((data) => {
+      setItems(data);
+      const initial: Record<string, ReviewDraft> = {};
+      data.forEach((i) => {
+        initial[i.menu_item_id] = { menu_item_id: i.menu_item_id, menu_item_name: i.menu_item_name, rating: 0, comment: "" };
+      });
+      setDrafts(initial);
+    }).finally(() => setLoading(false));
   }, []);
 
   const handleSubmit = async (menuItemId: string) => {

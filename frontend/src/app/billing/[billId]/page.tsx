@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   BillData,
@@ -40,13 +40,41 @@ export default function BillingPage() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Manager unlock token / role state
-  const [authToken] = useState<string | null>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("access_token") : null
-  );
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [cashNotes, setCashNotes] = useState("");
 
-  const loadBillData = useCallback(async () => {
-    if (!billId) return;
+  useEffect(() => {
+    const t = localStorage.getItem("access_token");
+    setAuthToken(t);
+
+    if (billId) {
+      loadBillData();
+    }
+  }, [billId]);
+
+  // Live polling interval so customer screen updates automatically when cashier settles bill
+  useEffect(() => {
+    if (!billId || bill?.status === "paid") return;
+
+    const interval = setInterval(() => {
+      pollBillData();
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [billId, bill?.status]);
+
+  // Load Razorpay checkout script
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  const loadBillData = async () => {
     try {
       setLoading(true);
       setErrorMsg(null);
@@ -60,9 +88,9 @@ export default function BillingPage() {
     } finally {
       setLoading(false);
     }
-  }, [billId, toast]);
+  };
 
-  const pollBillData = useCallback(async () => {
+  const pollBillData = async () => {
     if (!billId) return;
     try {
       const data = await getBill(billId);
@@ -77,35 +105,7 @@ export default function BillingPage() {
     } catch {
       // Ignore background polling errors
     }
-  }, [billId, toast]);
-
-  useEffect(() => {
-    if (billId) {
-      Promise.resolve().then(() => loadBillData());
-    }
-  }, [billId, loadBillData]);
-
-  // Live polling interval so customer screen updates automatically when cashier settles bill
-  useEffect(() => {
-    if (!billId || bill?.status === "paid") return;
-
-    const interval = setInterval(() => {
-      pollBillData();
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [billId, bill?.status, pollBillData]);
-
-  // Load Razorpay checkout script
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
+  };
 
   const handleCalculateSplit = async () => {
     if (!bill) return;

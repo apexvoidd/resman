@@ -1,7 +1,7 @@
 "use client";
 
 import { RouteGuard } from "@/components/RouteGuard";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 
@@ -30,7 +30,7 @@ function ReviewManagePage() {
 
   const isAuthorized = hasRole("manager") || hasRole("admin");
 
-  const load = useCallback(async () => {
+  const load = async () => {
     const token = await getToken();
     if (!token) return;
     const res = await fetch(`${API}/api/v1/reviews/manage?include_hidden=true`, {
@@ -38,15 +38,12 @@ function ReviewManagePage() {
     });
     if (res.ok) setReviews(await res.json());
     setLoading(false);
-  }, [getToken]);
+  };
 
   useEffect(() => {
-    if (!isLoading && isAuthorized) {
-      Promise.resolve().then(() => load());
-    } else if (!isLoading) {
-      Promise.resolve().then(() => setLoading(false));
-    }
-  }, [isLoading, isAuthorized, load]);
+    if (!isLoading && isAuthorized) load();
+    else if (!isLoading) setLoading(false);
+  }, [isLoading, isAuthorized]);
 
   const handleReply = async (reviewId: string) => {
     const token = await getToken();
@@ -134,7 +131,7 @@ function ReviewManagePage() {
               </button>
             </div>
 
-            {r.comment && <p className="text-sm text-gray-300 bg-gray-950 rounded-xl px-4 py-3">&quot;{r.comment}&quot;</p>}
+            {r.comment && <p className="text-sm text-gray-300 bg-gray-950 rounded-xl px-4 py-3">"{r.comment}"</p>}
 
             {r.manager_reply && (
               <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-xs text-blue-300">

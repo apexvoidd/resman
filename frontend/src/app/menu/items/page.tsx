@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
@@ -14,10 +14,12 @@ import {
   toggleMenuItemAvailability,
 } from "@/services/menu";
 import { getSafeImageUrl } from "@/lib/utils";
+import { useToast } from "@/context/ToastContext";
 
 function MenuItemListPage() {
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
+  const toast = useToast();
 
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -33,7 +35,7 @@ function MenuItemListPage() {
   const canManageMenu = hasRole("admin") || hasRole("manager");
   const canViewMenu = hasRole("waiter", "kitchen", "kitchen_staff", "chef", "cashier", "manager", "admin");
 
-  const loadData = useCallback(async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
       const token = await getToken();
@@ -64,12 +66,12 @@ function MenuItemListPage() {
     } finally {
       setLoading(false);
     }
-  }, [getToken, search, selectedCategory, availabilityFilter, priceSort]);
+  };
 
   useEffect(() => {
     if (isLoading || !canViewMenu) return;
-    Promise.resolve().then(() => loadData());
-  }, [isLoading, canViewMenu, loadData]);
+    loadData();
+  }, [isLoading, canViewMenu, search, selectedCategory, availabilityFilter, priceSort]);
 
   const handleToggleAvailability = async (item: MenuItem) => {
     try {

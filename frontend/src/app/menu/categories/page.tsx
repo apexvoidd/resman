@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 import {
@@ -30,7 +30,7 @@ export default function CategoryListPage() {
 
   const isStaffAuthorized = hasRole("admin") || hasRole("manager");
 
-  const loadCategories = useCallback(async () => {
+  const loadCategories = async () => {
     try {
       setLoading(true);
       const token = await getToken();
@@ -44,12 +44,12 @@ export default function CategoryListPage() {
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  };
 
   useEffect(() => {
     if (isLoading || !isStaffAuthorized) return;
-    Promise.resolve().then(() => loadCategories());
-  }, [isLoading, isStaffAuthorized, loadCategories]);
+    loadCategories();
+  }, [isLoading, isStaffAuthorized]);
 
   const openCreateModal = () => {
     setEditingCategory(null);

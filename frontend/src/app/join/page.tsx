@@ -64,7 +64,7 @@ export default function JoinPage() {
       }
     }
     init();
-  }, [toast]);
+  }, []);
 
   // 2. Countdown timer effect for 5-minute table reservation
   useEffect(() => {
@@ -129,7 +129,7 @@ export default function JoinPage() {
     }, 3000);
 
     return () => clearInterval(pollInterval);
-  }, [sessionToken, statusData?.verification_status, statusData?.in_queue, toast]);
+  }, [sessionToken, statusData?.verification_status, statusData?.in_queue]);
 
   const handleFindTable = async (e: React.FormEvent) => {
     e.preventDefault();

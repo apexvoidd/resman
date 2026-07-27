@@ -1,7 +1,7 @@
 "use client";
 
 import { RouteGuard } from "@/components/RouteGuard";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 
@@ -51,7 +51,7 @@ function CleaningDashboardPage() {
   const isAuthorized =
     hasRole("cleaning_staff", "cleaner", "housekeeping", "manager", "admin");
 
-  const loadTables = useCallback(async () => {
+  const loadTables = async () => {
     try {
       const token = await getToken();
       if (!token) return;
@@ -64,14 +64,14 @@ function CleaningDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  };
 
   useEffect(() => {
     if (isLoading || !isAuthorized) return;
-    Promise.resolve().then(() => loadTables());
+    loadTables();
     const interval = setInterval(loadTables, 3000);
     return () => clearInterval(interval);
-  }, [isLoading, isAuthorized, loadTables]);
+  }, [isLoading, isAuthorized]);
 
   const handleMarkClean = async (tableId: string, tableNumber: string) => {
     try {

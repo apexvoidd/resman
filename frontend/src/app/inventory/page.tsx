@@ -1,7 +1,7 @@
 "use client";
 
 import { RouteGuard } from "@/components/RouteGuard";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 import {
@@ -100,7 +100,7 @@ function InventoryPage() {
     notes: "",
   });
 
-  const loadData = useCallback(async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
       const token = await getToken();
@@ -112,7 +112,7 @@ function InventoryPage() {
         fetchIngredients(token, {
           search: search.trim() || undefined,
           category_id: selectedCategory || undefined,
-          stock_status: stockStatusFilter as unknown as undefined,
+          stock_status: stockStatusFilter as any,
           is_active: activeFilter === "all" ? undefined : activeFilter === "active",
           sort_by: sortBy,
         }),
@@ -128,9 +128,9 @@ function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [getToken, search, selectedCategory, stockStatusFilter, activeFilter, sortBy]);
+  };
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = async () => {
     try {
       const token = await getToken();
       if (!token) return;
@@ -140,18 +140,18 @@ function InventoryPage() {
       const e = err as Error;
       setErrorMsg(e.message || "Failed to load stock history.");
     }
-  }, [getToken]);
+  };
 
   useEffect(() => {
     if (isLoading || !isAuthorized) return;
-    Promise.resolve().then(() => loadData());
-  }, [isLoading, isAuthorized, loadData]);
+    loadData();
+  }, [isLoading, isAuthorized, search, selectedCategory, stockStatusFilter, sortBy, activeFilter]);
 
   useEffect(() => {
     if (activeTab === "history" && isAuthorized) {
-      Promise.resolve().then(() => loadHistory());
+      loadHistory();
     }
-  }, [activeTab, isAuthorized, loadHistory]);
+  }, [activeTab, isAuthorized]);
 
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,7 +300,7 @@ function InventoryPage() {
     setIngForm({
       name: ing.name,
       category_id: ing.category_id || "",
-      unit_of_measure: (ing.unit_of_measure as unknown as typeof ingForm.unit_of_measure) || "kg",
+      unit_of_measure: (ing.unit_of_measure as any) || "kg",
       current_stock: ing.current_stock,
       minimum_stock: ing.minimum_stock,
       reorder_level: ing.reorder_level,
@@ -490,7 +490,7 @@ function InventoryPage() {
 
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as unknown as typeof sortBy)}
+                  onChange={(e) => setSortBy(e.target.value as any)}
                   className="rounded-xl bg-gray-950 px-3 py-2 text-xs text-white ring-1 ring-white/10 focus:outline-none"
                 >
                   <option value="name">Sort: Name (A-Z)</option>
@@ -774,7 +774,7 @@ function InventoryPage() {
                 <label className="block font-semibold text-gray-300">Unit of Measure *</label>
                 <select
                   value={ingForm.unit_of_measure}
-                  onChange={(e) => setIngForm({ ...ingForm, unit_of_measure: e.target.value as unknown as typeof ingForm.unit_of_measure })}
+                  onChange={(e) => setIngForm({ ...ingForm, unit_of_measure: e.target.value as any })}
                   className="mt-1 w-full rounded-xl bg-gray-950 px-3.5 py-2 text-white ring-1 ring-white/10 focus:outline-none"
                 >
                   <option value="kg">kg (Kilograms)</option>
@@ -995,7 +995,7 @@ function InventoryPage() {
                 <label className="block font-semibold text-gray-300">Required Reason *</label>
                 <select
                   value={adjustForm.reason}
-                  onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value as unknown as typeof adjustForm.reason })}
+                  onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value as any })}
                   className="mt-1 w-full rounded-xl bg-gray-950 px-3.5 py-2.5 text-white ring-1 ring-white/10 focus:outline-none"
                 >
                   <option value="Stock Count Correction">Stock Count Correction</option>

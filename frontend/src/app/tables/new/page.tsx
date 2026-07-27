@@ -25,7 +25,7 @@ import {
 import { useToast } from "@/context/ToastContext";
 
 export default function AddTablePage() {
-  const { getToken, isLoaded: isAuthLoaded } = useAuth();
+  const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { hasRole, isLoading: isRbacLoading } = useRBAC();
   const canManage = hasRole("admin", "manager");
   const router = useRouter();

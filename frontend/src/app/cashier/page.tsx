@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 import { RouteGuard } from "@/components/RouteGuard";
@@ -33,7 +33,7 @@ interface Bill {
   items: BillItem[];
 }
 
-export default function CashierPOSPage() {
+  function CashierPOSPage() {
   const { getToken } = useAuth();
   const { isLoading: rbacLoading, hasRole } = useRBAC();
   const toast = useToast();
@@ -56,7 +56,7 @@ export default function CashierPOSPage() {
   const [notes, setNotes] = useState<string>("");
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
-  const loadBills = useCallback(async (isSilent = false) => {
+  const loadBills = async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
       setErrorMsg(null);
@@ -72,23 +72,23 @@ export default function CashierPOSPage() {
       }
       const data = await res.json();
       setBills(data);
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error(err);
-      if (!isSilent) setErrorMsg((err as Error).message || "Failed to load billing records.");
+      if (!isSilent) setErrorMsg(err.message || "Failed to load billing records.");
     } finally {
       if (!isSilent) setLoading(false);
     }
-  }, [getToken]);
+  };
 
   useEffect(() => {
     if (!rbacLoading && isAuthorized) {
-      Promise.resolve().then(() => loadBills(false));
+      loadBills(false);
       const interval = setInterval(() => {
         loadBills(true);
       }, 3000);
       return () => clearInterval(interval);
     }
-  }, [rbacLoading, isAuthorized, loadBills]);
+  }, [rbacLoading, isAuthorized]);
 
   const handleOpenSettlement = (bill: Bill) => {
     setSelectedBill(bill);
@@ -139,8 +139,8 @@ export default function CashierPOSPage() {
       toast.success(msg, "Bill Settled");
       setSelectedBill(null);
       loadBills();
-    } catch (err: unknown) {
-      const msg = (err as Error).message || "Settlement failed.";
+    } catch (err: any) {
+      const msg = err.message || "Settlement failed.";
       setErrorMsg(msg);
       toast.error(msg, "Settlement Failed");
     } finally {

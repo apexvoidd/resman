@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ShieldAlert,
+  Shield,
 } from "lucide-react";
 
 import { useToast } from "@/context/ToastContext";

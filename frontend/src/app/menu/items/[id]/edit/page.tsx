@@ -81,7 +81,7 @@ function EditMenuItemPage({ params }: { params: Promise<{ id: string }> }) {
     if (!isLoading && isStaffAuthorized) {
       load();
     }
-  }, [isLoading, isStaffAuthorized, itemId, getToken]);
+  }, [isLoading, isStaffAuthorized, itemId]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
