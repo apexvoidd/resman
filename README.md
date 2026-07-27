@@ -1,4 +1,4 @@
-# 🍽️ SmartDine — AI-Powered Restaurant Management System
+# 🍽️ ResMan OS (SmartDine) — AI-Powered Restaurant Management System
 
 > **Vibethon 6.0** · Team **ApexVoid** · Solo Participant: **Ayush Kumar**
 
@@ -19,9 +19,9 @@
 
 ---
 
-## 🧠 What is SmartDine?
+## 🧠 What is ResMan OS (SmartDine)?
 
-SmartDine is a **full-stack, production-ready restaurant management system** built for modern dine-in restaurants. It digitises the entire restaurant workflow — from customer QR check-in to kitchen display, billing, Razorpay payments, and post-meal reviews — all in real time.
+**ResMan OS (SmartDine)** is a **full-stack, production-ready restaurant management system** built for modern dine-in restaurants. It digitises the entire restaurant workflow — from customer QR check-in to kitchen display, billing, Razorpay payments, floating top notifications, and post-meal reviews — all in real time.
 
 No paper menus. No manual billing. No shouting across the floor.
 
