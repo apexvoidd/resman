@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { fetchGuestStatus, GuestStatusResponse } from "@/services/guest";
 import { Category, fetchCategories, fetchMenuItems, MenuItem } from "@/services/menu";
@@ -18,6 +18,7 @@ export default function CustomerSeatedMenuPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [billMsg, setBillMsg] = useState<string | null>(null);
   const [activeBill, setActiveBill] = useState<BillData | null>(null);
+  const prevOrdersRef = useRef<Record<string, string>>({});
 
   const checkBill = async (st: string) => {
     try {
@@ -34,10 +35,13 @@ export default function CustomerSeatedMenuPage() {
       setErrorMsg(null);
       const res = await requestBill(sessionToken);
       setBillMsg(res.message);
+      toast.success(res.message, "🧾 Bill Requested", 6000);
       await checkBill(sessionToken);
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to request bill.");
+      const msg = e.message || "Failed to request bill.";
+      setErrorMsg(msg);
+      toast.error(msg, "Bill Request Failed");
     }
   };
 
@@ -77,7 +81,9 @@ export default function CustomerSeatedMenuPage() {
         setLoading(true);
         const token = typeof window !== "undefined" ? localStorage.getItem("guest_session_token") : null;
         if (!token) {
-          setErrorMsg("No active guest session found. Please scan the entrance QR code.");
+          const msg = "No active guest session found. Please scan the entrance QR code.";
+          setErrorMsg(msg);
+          toast.error(msg, "Session Error");
           setLoading(false);
           return;
         }
@@ -95,7 +101,9 @@ export default function CustomerSeatedMenuPage() {
         setItems(itemsData.items);
       } catch (err: unknown) {
         const e = err as Error;
-        setErrorMsg(e.message || "Failed to initialize menu.");
+        const msg = e.message || "Failed to initialize menu.";
+        setErrorMsg(msg);
+        toast.error(msg, "Menu Error");
       } finally {
         setLoading(false);
       }
@@ -133,6 +141,24 @@ export default function CustomerSeatedMenuPage() {
     if (!sessionToken) return;
     try {
       const data = await fetchSessionOrders(sessionToken);
+
+      // Trigger floating popup toast for order status updates
+      data.forEach((ord) => {
+        const prevStatus = prevOrdersRef.current[ord.id];
+        if (prevStatus && prevStatus !== ord.status) {
+          if (ord.status === "ready") {
+            toast.success(`🍽️ Order #${ord.order_number} is READY! Waiter will bring your food shortly.`, "Kitchen Update", 7000);
+          } else if (ord.status === "preparing") {
+            toast.info(`🔥 Kitchen started preparing Order #${ord.order_number}.`, "Kitchen Update", 5000);
+          } else if (ord.status === "cancelled") {
+            toast.warning(`❌ Order #${ord.order_number} was cancelled.`, "Order Status Update", 6000);
+          } else if (ord.status === "served" || ord.status === "completed") {
+            toast.success(`✨ Order #${ord.order_number} has been served! Enjoy your meal.`, "Order Served", 6000);
+          }
+        }
+        prevOrdersRef.current[ord.id] = ord.status;
+      });
+
       setSessionOrders(data);
     } catch (err: unknown) {
       const e = err as Error;
@@ -175,10 +201,13 @@ export default function CustomerSeatedMenuPage() {
     try {
       setSubmitting(true);
       await cancelOrder(sessionToken, orderId);
+      toast.success("Order cancelled successfully.", "Order Cancelled");
       await loadSessionOrders();
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to cancel order.");
+      const msg = e.message || "Failed to cancel order.";
+      setErrorMsg(msg);
+      toast.error(msg, "Cancellation Failed");
     } finally {
       setSubmitting(false);
     }

@@ -13,6 +13,7 @@ import {
   TableStatusType,
 } from "@/services/table";
 import Link from "next/link";
+import { useToast } from "@/context/ToastContext";
 import {
   UtensilsCrossed,
   Plus,
@@ -82,6 +83,7 @@ const STATUS_CONFIG: Record<
 function TableListPage() {
   const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { hasRole, isLoading: isRbacLoading } = useRBAC();
+  const toast = useToast();
   const canManage = hasRole("admin", "manager");
   const queryClient = useQueryClient();
 
@@ -140,17 +142,15 @@ function TableListPage() {
     },
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["tables-list"] });
-      setNotification({
-        type: "success",
-        text: `Table '${updated.table_number}' status updated to ${updated.status}.`,
-      });
+      const msg = `Table '${updated.table_number}' status updated to ${updated.status}.`;
+      setNotification({ type: "success", text: msg });
+      toast.success(msg, "Table Updated");
       setTimeout(() => setNotification(null), 4000);
     },
     onError: (err: Error) => {
-      setNotification({
-        type: "error",
-        text: err.message || "Failed to update table status.",
-      });
+      const msg = err.message || "Failed to update table status.";
+      setNotification({ type: "error", text: msg });
+      toast.error(msg, "Table Error");
     },
   });
 
@@ -163,19 +163,17 @@ function TableListPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tables-list"] });
+      const msg = `Table '${deletingTable?.table_number}' deleted successfully.`;
+      setNotification({ type: "success", text: msg });
+      toast.success(msg, "Table Deleted");
       setDeletingTable(null);
-      setNotification({
-        type: "success",
-        text: "Dining table deleted successfully.",
-      });
       setTimeout(() => setNotification(null), 4000);
     },
     onError: (err: Error) => {
+      const msg = err.message || "Failed to delete table.";
+      setNotification({ type: "error", text: msg });
+      toast.error(msg, "Delete Error");
       setDeletingTable(null);
-      setNotification({
-        type: "error",
-        text: err.message || "Failed to delete table.",
-      });
     },
   });
 

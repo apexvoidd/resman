@@ -14,10 +14,12 @@ import {
   toggleMenuItemAvailability,
 } from "@/services/menu";
 import { getSafeImageUrl } from "@/lib/utils";
+import { useToast } from "@/context/ToastContext";
 
 function MenuItemListPage() {
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
+  const toast = useToast();
 
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);

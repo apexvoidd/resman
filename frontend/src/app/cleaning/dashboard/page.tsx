@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 
+import { useToast } from "@/context/ToastContext";
+
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 interface CleaningTable {
@@ -37,6 +39,7 @@ async function markTableClean(token: string, tableId: string): Promise<void> {
 function CleaningDashboardPage() {
   const { getToken } = useAuth();
   const { isLoading, hasRole } = useRBAC();
+  const toast = useToast();
 
   const [tables, setTables] = useState<CleaningTable[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,12 +81,15 @@ function CleaningDashboardPage() {
       if (!token) return;
       await markTableClean(token, tableId);
       setCompletedIds((prev) => new Set([...prev, tableId]));
-      setSuccessMsg(`Table ${tableNumber} marked clean and available!`);
-      setTimeout(() => setSuccessMsg(null), 3000);
+      const msg = `Table ${tableNumber} marked clean & ready!`;
+      setSuccessMsg(msg);
+      toast.success(msg, "Table Cleaned");
       await loadTables();
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to mark table clean.");
+      const msg = e.message || "Failed to mark table clean.";
+      setErrorMsg(msg);
+      toast.error(msg, "Housekeeping Error");
     } finally {
       setActionLoading(null);
     }

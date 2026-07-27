@@ -14,8 +14,10 @@ import {
   unlockSession,
   verifyRazorpayPayment,
 } from "@/services/billing";
+import { useToast } from "@/context/ToastContext";
 
 export default function BillingPage() {
+  const toast = useToast();
   const params = useParams();
   const router = useRouter();
   const billId = params.billId as string;
@@ -80,7 +82,9 @@ export default function BillingPage() {
       setBill(data);
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to load bill.");
+      const msg = e.message || "Failed to load bill.";
+      setErrorMsg(msg);
+      toast.error(msg, "Bill Error");
     } finally {
       setLoading(false);
     }
@@ -92,7 +96,9 @@ export default function BillingPage() {
       const data = await getBill(billId);
       setBill((prev) => {
         if (prev && prev.status !== "paid" && data.status === "paid") {
-          setSuccessMsg("Payment Confirmed & Settled by Cashier! 🎉 Thank you for dining with us.");
+          const msg = "Payment Confirmed & Settled by Cashier! 🎉 Thank you for dining with us.";
+          setSuccessMsg(msg);
+          toast.success(msg, "Bill Settled", 8000);
         }
         return data;
       });
@@ -114,9 +120,12 @@ export default function BillingPage() {
         order_item_ids: selectedItemIds,
       });
       setSplitResult(res);
+      toast.success(res.message || `Split share updated: ₹${res.share_amount.toFixed(2)}`, "Split Calculated");
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to calculate split.");
+      const msg = e.message || "Failed to calculate split.";
+      setErrorMsg(msg);
+      toast.error(msg, "Split Error");
     } finally {
       setIsSplitting(false);
     }
@@ -185,11 +194,15 @@ export default function BillingPage() {
                 razorpay_signature: response.razorpay_signature,
                 amount: targetAmount,
               });
-              setSuccessMsg("Payment completed successfully!");
+              const msg = "Payment completed successfully! 🎉";
+              setSuccessMsg(msg);
+              toast.success(msg, "Payment Success", 8000);
               await loadBillData();
             } catch (err: unknown) {
               const e = err as Error;
-              setErrorMsg(e.message || "Payment verification failed. Please contact staff.");
+              const msg = e.message || "Payment verification failed. Please contact staff.";
+              setErrorMsg(msg);
+              toast.error(msg, "Payment Verification Error");
             } finally {
               setIsProcessingPayment(false);
             }
@@ -204,7 +217,6 @@ export default function BillingPage() {
         };
         const rzp = new (window as unknown as { Razorpay: new (opts: unknown) => { open: () => void } }).Razorpay(options);
         rzp.open();
-        // Don't set isProcessingPayment to false here — handler or ondismiss will do it
         return;
       } else {
         // Dev fallback simulation with HMAC backend verification
@@ -217,12 +229,16 @@ export default function BillingPage() {
           razorpay_signature: mockSig,
           amount: targetAmount,
         });
-        setSuccessMsg("Razorpay Payment verified & completed!");
+        const msg = "Razorpay Payment verified & completed!";
+        setSuccessMsg(msg);
+        toast.success(msg, "Payment Verified", 8000);
         await loadBillData();
       }
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Payment failed.");
+      const msg = e.message || "Payment failed.";
+      setErrorMsg(msg);
+      toast.error(msg, "Payment Error");
     } finally {
       setIsProcessingPayment(false);
     }
@@ -240,16 +256,22 @@ export default function BillingPage() {
       if (authToken) {
         // Staff logged in — confirm cash payment directly
         await confirmCashPayment(authToken, bill.id, targetAmount, cashNotes);
-        setSuccessMsg("Cash payment recorded & session closed!");
+        const msg = "Cash payment recorded & session closed!";
+        setSuccessMsg(msg);
+        toast.success(msg, "Cash Settled", 6000);
         await loadBillData();
       } else {
         // Customer on phone — request cash settlement from cashier/waiter
         const res = await requestCashSettlement(bill.id);
-        setSuccessMsg(res.message || `Cash settlement request sent! Please pay ₹${targetAmount.toFixed(2)} to staff at your table or cashier counter.`);
+        const msg = res.message || `Cash settlement request sent! Please pay ₹${targetAmount.toFixed(2)} to staff at your table or cashier counter.`;
+        setSuccessMsg(msg);
+        toast.success(msg, "Cash Request Sent", 7000);
       }
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to record cash payment.");
+      const msg = e.message || "Failed to record cash payment.";
+      setErrorMsg(msg);
+      toast.error(msg, "Cash Error");
     } finally {
       setIsProcessingPayment(false);
     }
@@ -260,11 +282,15 @@ export default function BillingPage() {
     try {
       setErrorMsg(null);
       await unlockSession(authToken, bill.session_id);
-      setSuccessMsg("Dining session unlocked by Manager.");
+      const msg = "Dining session unlocked by Manager.";
+      setSuccessMsg(msg);
+      toast.success(msg, "Session Unlocked");
       await loadBillData();
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Only Manager can unlock session.");
+      const msg = e.message || "Only Manager can unlock session.";
+      setErrorMsg(msg);
+      toast.error(msg, "Unlock Error");
     }
   };
 

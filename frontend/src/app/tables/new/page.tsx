@@ -22,11 +22,14 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 
+import { useToast } from "@/context/ToastContext";
+
 export default function AddTablePage() {
   const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { hasRole, isLoading: isRbacLoading } = useRBAC();
   const canManage = hasRole("admin", "manager");
   const router = useRouter();
+  const toast = useToast();
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -51,11 +54,14 @@ export default function AddTablePage() {
       if (!token) throw new Error("Unauthenticated");
       return createTable(token, values);
     },
-    onSuccess: () => {
+    onSuccess: (table) => {
+      toast.success(`Dining Table '${table.table_number}' created successfully!`, "Table Created");
       router.push("/tables");
     },
     onError: (err: Error) => {
-      setErrorMsg(err.message || "Failed to create dining table.");
+      const msg = err.message || "Failed to create dining table.";
+      setErrorMsg(msg);
+      toast.error(msg, "Creation Failed");
     },
   });
 

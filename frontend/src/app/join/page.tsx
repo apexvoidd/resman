@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   cancelGuestReservation,
@@ -10,8 +10,10 @@ import {
   initGuestSession,
   markAtTable,
 } from "@/services/guest";
+import { useToast } from "@/context/ToastContext";
 
 export default function JoinPage() {
+  const toast = useToast();
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -26,6 +28,7 @@ export default function JoinPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [cooldownTimer, setCooldownTimer] = useState<number | null>(null);
+  const prevVerificationRef = useRef<string | null | undefined>(null);
 
   // 1. Initialize guest session on mount
   useEffect(() => {
@@ -43,6 +46,7 @@ export default function JoinPage() {
         // Fetch current live status
         const statusRes = await fetchGuestStatus(session.session_token);
         setStatusData(statusRes);
+        prevVerificationRef.current = statusRes.verification_status;
 
         if (statusRes.remaining_seconds) {
           setCountdown(statusRes.remaining_seconds);
@@ -52,7 +56,9 @@ export default function JoinPage() {
         }
       } catch (err: unknown) {
         const e = err as Error;
-        setErrorMsg(e.message || "Failed to initialize guest session.");
+        const msg = e.message || "Failed to initialize guest session.";
+        setErrorMsg(msg);
+        toast.error(msg, "Session Error");
       } finally {
         setLoading(false);
       }
@@ -107,6 +113,14 @@ export default function JoinPage() {
     const pollInterval = setInterval(() => {
       fetchGuestStatus(sessionToken)
         .then((res) => {
+          if (prevVerificationRef.current !== res.verification_status) {
+            if (res.verification_status === "confirmed" || res.table_status === "occupied" || res.menu_unlocked) {
+              toast.success("🎉 Arrival verified by waiter! Digital menu access is now unlocked.", "Verified Seated", 7000);
+            } else if (res.verification_status === "rejected") {
+              toast.error(res.rejection_reason || "Verification rejected by staff.", "Verification Failed", 7000);
+            }
+            prevVerificationRef.current = res.verification_status;
+          }
           setStatusData(res);
           if (res.remaining_seconds) setCountdown(res.remaining_seconds);
           if (res.cooldown_remaining_seconds) setCooldownTimer(res.cooldown_remaining_seconds);
@@ -153,12 +167,20 @@ export default function JoinPage() {
         message: res.message,
       });
 
+      if (res.assigned && res.table_number) {
+        toast.success(`🎉 Table ${res.table_number} assigned! Please proceed to your table within 5 minutes.`, "Table Assigned", 7000);
+      } else if (res.in_queue) {
+        toast.info(res.message || `All matching tables occupied. You are #${res.queue_position} in line.`, "Waitlist Queue", 7000);
+      }
+
       if (res.remaining_seconds) {
         setCountdown(res.remaining_seconds);
       }
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to reserve a table.");
+      const msg = e.message || "Failed to reserve a table.";
+      setErrorMsg(msg);
+      toast.error(msg, "Check-In Failed");
     } finally {
       setSubmitting(false);
     }
@@ -173,12 +195,15 @@ export default function JoinPage() {
 
       const res = await markAtTable(sessionToken);
       setStatusData(res);
+      toast.success("📍 Waiter notified! Staff will verify your arrival shortly.", "Staff Notified", 6000);
       if (res.remaining_seconds) {
         setCountdown(res.remaining_seconds);
       }
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to notify waiter.");
+      const msg = e.message || "Failed to notify waiter.";
+      setErrorMsg(msg);
+      toast.error(msg, "Notification Failed");
     } finally {
       setSubmitting(false);
     }
@@ -194,13 +219,16 @@ export default function JoinPage() {
       const res = await cancelGuestReservation(sessionToken);
       setStatusData(res);
       setCountdown(null);
+      toast.info("Table reservation cancelled.", "Cancelled", 5000);
 
       if (res.cooldown_remaining_seconds) {
         setCooldownTimer(res.cooldown_remaining_seconds);
       }
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to cancel reservation.");
+      const msg = e.message || "Failed to cancel reservation.";
+      setErrorMsg(msg);
+      toast.error(msg, "Cancellation Failed");
     } finally {
       setSubmitting(false);
     }
@@ -213,6 +241,7 @@ export default function JoinPage() {
       setSubmitting(true);
       const statusRes = await fetchGuestStatus(sessionToken);
       setStatusData(statusRes);
+      toast.info("Status updated.", "Refreshed", 3000);
 
       if (statusRes.remaining_seconds) {
         setCountdown(statusRes.remaining_seconds);
@@ -225,7 +254,9 @@ export default function JoinPage() {
       }
     } catch (err: unknown) {
       const e = err as Error;
-      setErrorMsg(e.message || "Failed to refresh status.");
+      const msg = e.message || "Failed to refresh status.";
+      setErrorMsg(msg);
+      toast.error(msg, "Refresh Error");
     } finally {
       setSubmitting(false);
     }

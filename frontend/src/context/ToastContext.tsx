@@ -84,22 +84,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={contextValue}>
       {children}
 
-      {/* Floating Toast Overlay Container (Top on Mobile, Bottom-Right on Desktop) */}
+      {/* Floating Toast Popup Overlay Container (Top-Center on Mobile, Top-Right on Desktop) */}
       <div
-        className="fixed top-3 left-3 right-3 sm:top-auto sm:left-auto sm:bottom-6 sm:right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-[calc(100%-1.5rem)] sm:w-96 pointer-events-none mx-auto sm:mx-0"
+        className="fixed top-4 left-4 right-4 sm:top-5 sm:right-5 sm:left-auto sm:bottom-auto z-[99999] flex flex-col gap-2.5 max-w-md w-[calc(100%-2rem)] sm:w-96 pointer-events-none mx-auto sm:mx-0"
         aria-live="polite"
       >
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-start gap-3 p-3.5 sm:p-4 rounded-2xl border shadow-2xl backdrop-blur-xl transition-all duration-300 transform translate-y-0 animate-in slide-in-from-top-4 sm:slide-in-from-bottom-5 fade-in ${
+            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border shadow-2xl backdrop-blur-xl transition-all duration-300 transform translate-y-0 animate-in slide-in-from-top-4 fade-in ${
               t.type === "error"
-                ? "bg-slate-900/95 border-red-500/40 text-red-100 shadow-red-500/20 ring-1 ring-red-500/30"
+                ? "bg-slate-900/95 border-red-500/50 text-red-100 shadow-red-500/25 ring-1 ring-red-500/30"
                 : t.type === "success"
-                ? "bg-slate-900/95 border-emerald-500/40 text-emerald-100 shadow-emerald-500/20 ring-1 ring-emerald-500/30"
+                ? "bg-slate-900/95 border-emerald-500/50 text-emerald-100 shadow-emerald-500/25 ring-1 ring-emerald-500/30"
                 : t.type === "warning"
-                ? "bg-slate-900/95 border-amber-500/40 text-amber-100 shadow-amber-500/20 ring-1 ring-amber-500/30"
-                : "bg-slate-900/95 border-sky-500/40 text-sky-100 shadow-sky-500/20 ring-1 ring-sky-500/30"
+                ? "bg-slate-900/95 border-amber-500/50 text-amber-100 shadow-amber-500/25 ring-1 ring-amber-500/30"
+                : "bg-slate-900/95 border-sky-500/50 text-sky-100 shadow-sky-500/25 ring-1 ring-sky-500/30"
             }`}
           >
             {/* Icon */}
@@ -133,7 +133,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   {t.title}
                 </h4>
               )}
-              <p className="text-xs font-medium leading-relaxed break-words text-slate-200">
+              <p className="text-xs font-medium leading-relaxed break-words text-slate-100">
                 {t.message}
               </p>
             </div>
@@ -141,7 +141,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             {/* Dismiss Close Button */}
             <button
               onClick={() => removeToast(t.id)}
-              className="shrink-0 p-1 text-slate-400 hover:text-white rounded-lg transition"
+              className="shrink-0 p-1 text-slate-400 hover:text-white rounded-lg transition hover:bg-white/10"
               aria-label="Close Toast"
             >
               <X className="h-4 w-4" />
