@@ -60,6 +60,8 @@ if connect_args:
 if not db_url.startswith("sqlite"):
     kwargs["pool_size"] = settings.DB_POOL_SIZE
     kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
+    kwargs["pool_pre_ping"] = settings.DB_POOL_PRE_PING
+    kwargs["pool_recycle"] = settings.DB_POOL_RECYCLE
 
 engine = create_async_engine(db_url, **kwargs)
 

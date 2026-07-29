@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     )
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
+    DB_POOL_PRE_PING: bool = True
+    DB_POOL_RECYCLE: int = 300
     DB_ECHO: bool = False
 
     # Cache (Redis / Upstash)
