@@ -323,7 +323,17 @@ async def generate_bill(
     )
 
     await db.commit()
-    await db.refresh(bill)
+    
+    bill_res = await db.execute(
+        select(Bill)
+        .options(
+            selectinload(Bill.items),
+            selectinload(Bill.order).selectinload(Order.table),
+            selectinload(Bill.order).selectinload(Order.guest_session),
+        )
+        .where(Bill.id == bill.id)
+    )
+    bill = bill_res.scalar_one()
 
     return _build_bill_out(bill, order, settings_obj)
 
