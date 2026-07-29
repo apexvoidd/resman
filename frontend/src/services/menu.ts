@@ -31,6 +31,8 @@ export interface MenuItem {
   is_jain: boolean;
   spicy_level: number;
   display_order: number;
+  average_rating?: number | null;
+  total_ratings?: number;
   created_at: string;
   updated_at: string;
 }

@@ -432,7 +432,12 @@ export default function CustomerSeatedMenuPage() {
 
                     <p className="text-xs text-gray-400 line-clamp-2">{dish.description || "Freshly cooked dish."}</p>
 
-                    <div className="flex flex-wrap gap-1.5 text-[10px] text-gray-400">
+                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-400">
+                      {dish.average_rating ? (
+                        <span className="text-amber-400 font-bold bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">
+                          ★ {dish.average_rating.toFixed(1)} ({dish.total_ratings})
+                        </span>
+                      ) : null}
                       <span>⏱️ {dish.preparation_time_minutes} min</span>
                       {dish.is_vegetarian && <span className="text-emerald-400">🌱 Veg</span>}
                     </div>

@@ -221,6 +221,11 @@ export default function PublicMenuPage() {
                         ★ Chef Special
                       </span>
                     )}
+                    {dish.average_rating ? (
+                      <span className="rounded-full bg-gray-950/80 backdrop-blur border border-amber-500/30 px-2.5 py-0.5 text-[10px] font-bold text-amber-400 shadow flex items-center gap-1">
+                        ★ {dish.average_rating.toFixed(1)} <span className="text-gray-400 text-[9px]">({dish.total_ratings})</span>
+                      </span>
+                    ) : null}
                   </div>
 
                   {!dish.is_available && (
@@ -328,15 +333,21 @@ export default function PublicMenuPage() {
 
               <p className="text-sm text-gray-300">{selectedDish.description || "No description provided."}</p>
 
-              <div className="grid grid-cols-2 gap-3 rounded-xl bg-gray-950 p-4 text-xs text-gray-300 border border-gray-800">
+              <div className="grid grid-cols-3 gap-3 rounded-xl bg-gray-950 p-4 text-xs text-gray-300 border border-gray-800">
                 <div>
-                  <span className="text-gray-500 block">Prep Time</span>
-                  <span className="font-semibold text-white">⏱️ {selectedDish.preparation_time_minutes} minutes</span>
+                  <span className="text-gray-500 block">Rating</span>
+                  <span className="font-semibold text-amber-400">
+                    {selectedDish.average_rating ? `★ ${selectedDish.average_rating.toFixed(1)} (${selectedDish.total_ratings})` : "New"}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-gray-500 block">Spice Intensity</span>
+                  <span className="text-gray-500 block">Prep Time</span>
+                  <span className="font-semibold text-white">⏱️ {selectedDish.preparation_time_minutes} min</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block">Spice Level</span>
                   <span className="font-semibold text-white">
-                    {selectedDish.spicy_level > 0 ? `🌶️ ${selectedDish.spicy_level} / 5` : "Mild (0)"}
+                    {selectedDish.spicy_level > 0 ? `🌶️ ${selectedDish.spicy_level}/5` : "Mild (0)"}
                   </span>
                 </div>
               </div>

@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.menu import Category, MenuItem
 from app.models.restaurant import Branch, Restaurant
+from app.models.review import Review
 from app.schemas.menu import (
     CategoryCreate,
     CategoryOut,
@@ -46,7 +47,9 @@ def _build_category_out(category: Category) -> CategoryOut:
     )
 
 
-def _build_menu_item_out(item: MenuItem) -> MenuItemOut:
+def _build_menu_item_out(
+    item: MenuItem, avg_rating: float | None = None, total_ratings: int = 0
+) -> MenuItemOut:
     """Map MenuItem ORM model to MenuItemOut DTO."""
     return MenuItemOut(
         id=item.id,
@@ -64,6 +67,8 @@ def _build_menu_item_out(item: MenuItem) -> MenuItemOut:
         is_jain=item.is_jain,
         spicy_level=item.spicy_level,
         display_order=item.display_order,
+        average_rating=avg_rating,
+        total_ratings=total_ratings,
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
@@ -278,7 +283,37 @@ async def get_menu_item_list(
     result = await db.execute(query)
     items = result.scalars().all()
 
-    item_dtos = [_build_menu_item_out(i) for i in items]
+    item_ids = [i.id for i in items]
+    ratings_map: dict[uuid.UUID, tuple[float | None, int]] = {}
+    if item_ids:
+        ratings_res = await db.execute(
+            select(
+                Review.menu_item_id,
+                func.avg(Review.rating).label("avg_rating"),
+                func.count(Review.id).label("total_ratings"),
+            )
+            .where(
+                Review.menu_item_id.in_(item_ids),
+                Review.deleted_at.is_(None),
+                Review.is_hidden.is_(False),
+            )
+            .group_by(Review.menu_item_id)
+        )
+        for row in ratings_res.all():
+            if row.menu_item_id and row.avg_rating is not None:
+                ratings_map[row.menu_item_id] = (
+                    round(float(row.avg_rating), 1),
+                    int(row.total_ratings or 0),
+                )
+
+    item_dtos = [
+        _build_menu_item_out(
+            i,
+            avg_rating=ratings_map.get(i.id, (None, 0))[0],
+            total_ratings=ratings_map.get(i.id, (None, 0))[1],
+        )
+        for i in items
+    ]
     total_pages = math.ceil(total / page_size) if total > 0 else 1
 
     return MenuItemListResponse(
@@ -303,7 +338,22 @@ async def get_menu_item_by_id(db: AsyncSession, item_id: uuid.UUID) -> MenuItemO
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Menu item '{item_id}' not found.",
         )
-    return _build_menu_item_out(item)
+    
+    rating_res = await db.execute(
+        select(
+            func.avg(Review.rating).label("avg_rating"),
+            func.count(Review.id).label("total_ratings"),
+        ).where(
+            Review.menu_item_id == item_id,
+            Review.deleted_at.is_(None),
+            Review.is_hidden.is_(False),
+        )
+    )
+    r_row = rating_res.first()
+    avg_r = round(float(r_row.avg_rating), 1) if r_row and r_row.avg_rating else None
+    tot_r = int(r_row.total_ratings) if r_row and r_row.total_ratings else 0
+
+    return _build_menu_item_out(item, avg_rating=avg_r, total_ratings=tot_r)
 
 
 async def create_menu_item(db: AsyncSession, payload: MenuItemCreate) -> MenuItemOut:

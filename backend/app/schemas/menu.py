@@ -77,6 +77,8 @@ class MenuItemOut(BaseModel):
     is_jain: bool
     spicy_level: int
     display_order: int
+    average_rating: float | None = None
+    total_ratings: int = 0
     created_at: datetime
     updated_at: datetime
 
