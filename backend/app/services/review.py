@@ -28,11 +28,18 @@ logger = logging.getLogger("app.services.review")
 
 
 def _build_review_out(review: Review) -> ReviewOut:
+    email = None
+    if review.guest_session and review.guest_session.guest_email:
+        email = review.guest_session.guest_email
+    elif review.customer and review.customer.email:
+        email = review.customer.email
+
     return ReviewOut(
         id=review.id,
         menu_item_id=review.menu_item_id,
         menu_item_name=review.menu_item.name if review.menu_item else None,
         display_name=review.display_name,
+        customer_email=email,
         rating=review.rating,
         comment=review.comment,
         manager_reply=review.manager_reply,
@@ -254,7 +261,11 @@ async def get_all_reviews_manager(
     """Manager view: all reviews, optionally including hidden ones."""
     q = (
         select(Review)
-        .options(selectinload(Review.menu_item))
+        .options(
+            selectinload(Review.menu_item),
+            selectinload(Review.guest_session),
+            selectinload(Review.customer),
+        )
         .where(Review.deleted_at.is_(None))
     )
     if not include_hidden:

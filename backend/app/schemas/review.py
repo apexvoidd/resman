@@ -39,6 +39,7 @@ class ReviewOut(BaseModel):
     menu_item_id: uuid.UUID | None
     menu_item_name: str | None = None
     display_name: str | None
+    customer_email: str | None = None
     rating: int
     comment: str | None
     manager_reply: str | None
