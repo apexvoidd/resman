@@ -31,30 +31,6 @@ function KitchenDashboardPage() {
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [sortBy, setSortBy] = useState<"oldest" | "newest" | "longest_waiting">("oldest");
-  const [viewMode, setViewMode] = useState<"table" | "order">("table");
-
-  // Group active orders by table_number
-  const tableGroupMap = orders.reduce<Record<string, OrderOut[]>>((acc, ord) => {
-    const key = ord.table_number ? `Table ${ord.table_number}` : "Walk-in / Counter";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(ord);
-    return acc;
-  }, {});
-
-  const tableGroups = Object.entries(tableGroupMap).map(([tableName, tableOrders]) => {
-    const hasDelayed = tableOrders.some((o) => o.is_delayed);
-    const hasUrgent = tableOrders.some((o) => o.priority === "urgent");
-    const maxElapsed = Math.max(...tableOrders.map((o) => o.elapsed_seconds ?? 0));
-    const guestCount = tableOrders[0]?.guest_count || 1;
-    return {
-      tableName,
-      guestCount,
-      tableOrders,
-      hasDelayed,
-      hasUrgent,
-      maxElapsed,
-    };
-  });
 
   // Double click protection & modal state
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -360,460 +336,230 @@ function KitchenDashboardPage() {
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 bg-gray-950 p-1 rounded-xl border border-gray-800">
-              <button
-                type="button"
-                onClick={() => setViewMode("table")}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
-                  viewMode === "table"
-                    ? "bg-amber-500 text-gray-950 shadow"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                🪑 Table View
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("order")}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
-                  viewMode === "order"
-                    ? "bg-amber-500 text-gray-950 shadow"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                📋 Order View
-              </button>
-            </div>
-
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as "oldest" | "newest" | "longest_waiting")}
-              className="rounded-xl bg-gray-950 px-3 py-2 text-xs text-white ring-1 ring-white/10 focus:outline-none"
-            >
-              <option value="oldest">Sort: Oldest Order (FIFO)</option>
-              <option value="newest">Sort: Newest Order</option>
-              <option value="longest_waiting">Sort: Longest Waiting</option>
-            </select>
-          </div>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as "oldest" | "newest" | "longest_waiting")}
+            className="rounded-xl bg-gray-950 px-3 py-2 text-xs text-white ring-1 ring-white/10 focus:outline-none"
+          >
+            <option value="oldest">Sort: Oldest Order (FIFO)</option>
+            <option value="newest">Sort: Newest Order</option>
+            <option value="longest_waiting">Sort: Longest Waiting</option>
+          </select>
         </div>
 
-        {/* Active Cards Grid */}
-        {viewMode === "table" ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {tableGroups.length === 0 ? (
-              <div className="col-span-full rounded-2xl border border-gray-800 bg-gray-900 p-12 text-center text-sm text-gray-500">
-                No active kitchen orders. Standby for incoming customer orders!
-              </div>
-            ) : (
-              tableGroups.map((group) => (
+        {/* Active Order Cards Grid */}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {orders.length === 0 ? (
+            <div className="col-span-full rounded-2xl border border-gray-800 bg-gray-900 p-12 text-center text-sm text-gray-500">
+              No active kitchen orders. Standby for incoming customer orders!
+            </div>
+          ) : (
+            orders.map((ord) => {
+              const isActionDisabled = actionLoading === ord.id;
+
+              const isDone = ["completed", "served", "cancelled"].includes(ord.status);
+
+              return (
                 <div
-                  key={group.tableName}
+                  key={ord.id}
                   className={`flex flex-col justify-between overflow-hidden rounded-2xl border transition shadow-xl ${
-                    group.hasDelayed
+                    isDone
+                      ? "border-gray-700/50 bg-gray-950/60 opacity-70"
+                      : ord.is_delayed
                       ? "border-red-500/50 bg-red-950/20 ring-1 ring-red-500/40"
-                      : group.hasUrgent
-                      ? "border-amber-500/50 bg-gray-900 ring-1 ring-amber-500/40"
+                      : ord.status === "pending"
+                      ? "border-amber-500/40 bg-gray-900"
+                      : ord.status === "ready"
+                      ? "border-emerald-500/40 bg-emerald-950/10"
                       : "border-gray-800 bg-gray-900"
                   }`}
                 >
                   <div>
-                    {group.hasDelayed && (
+                    {/* Delayed Warning Banner */}
+                    {ord.is_delayed && (
                       <div className="bg-red-500/20 px-4 py-2 border-b border-red-500/30 text-center text-xs font-black text-red-400 animate-pulse">
-                        ⚠️ DELAYED ORDERS — Exceeded Estimated Preparation Time
+                        ⚠️ DELAYED — Exceeded Estimated Preparation Time
                       </div>
                     )}
 
-                    {/* Table Card Header */}
-                    <div className="flex items-center justify-between border-b border-gray-800 bg-gray-950 px-5 py-3.5">
+                    {/* Card Header */}
+                    <div className="flex items-center justify-between border-b border-gray-800 bg-gray-950 px-5 py-3">
                       <div>
-                        <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                          📍 {group.tableName}
-                        </h3>
-                        <p className="text-xs text-gray-400">
-                          {group.guestCount} Guests • {group.tableOrders.length} Order(s)
+                        <span className="font-mono text-sm font-bold text-amber-400">{ord.order_number}</span>
+                        <p className="text-[11px] text-gray-400">
+                          Table {ord.table_number || "Walk-in"} • {ord.guest_count || 1} Guests
                         </p>
                       </div>
 
+                      {/* Priority Badge */}
                       <div className="flex flex-col items-end gap-1">
-                        {group.hasUrgent && (
-                          <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[9px] font-black uppercase text-red-300 ring-1 ring-red-500/40 animate-pulse">
-                            Urgent
-                          </span>
-                        )}
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ring-1 ${
+                            ord.priority === "urgent"
+                              ? "bg-red-500/20 text-red-300 ring-red-500/40 animate-pulse"
+                              : ord.priority === "high"
+                              ? "bg-orange-500/20 text-orange-300 ring-orange-500/40"
+                              : "bg-gray-800 text-gray-400 ring-gray-700"
+                          }`}
+                        >
+                          {ord.priority}
+                        </span>
                         <span className="text-[10px] text-gray-400 font-mono">
-                          ⏱️ Max: {formatElapsed(group.maxElapsed)}
+                          ⏱️ Elapsed: {formatElapsed(ord.elapsed_seconds ?? 0)}
                         </span>
                       </div>
                     </div>
 
-                    {/* Orders Sub-List for this Table */}
-                    <div className="p-4 space-y-4 divide-y divide-gray-800/80">
-                      {group.tableOrders.map((ord) => {
-                        const isActionDisabled = actionLoading === ord.id;
-                        const isDone = ["completed", "served", "cancelled"].includes(ord.status);
-
-                        return (
-                          <div key={ord.id} className="pt-3 first:pt-0 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-xs font-bold text-amber-400">{ord.order_number}</span>
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase ring-1 ${
-                                    ord.status === "pending"
-                                      ? "bg-amber-500/10 text-amber-400 ring-amber-500/30"
-                                      : ord.status === "preparing"
-                                      ? "bg-blue-500/10 text-blue-400 ring-blue-500/30"
-                                      : ord.status === "ready"
-                                      ? "bg-emerald-500/20 text-emerald-300 ring-emerald-500/40"
-                                      : "bg-gray-800 text-gray-300 ring-gray-700"
-                                  }`}
-                                >
-                                  {ord.status_message || ord.status}
-                                </span>
-                              </div>
-                              {ord.estimated_prep_minutes && (
-                                <span className="text-[10px] text-emerald-400 font-semibold">
-                                  ⏱️ {ord.estimated_prep_minutes} min
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="space-y-2">
-                              {ord.items.map((item) => (
-                                <div key={item.id} className="text-xs">
-                                  <div className="flex justify-between items-start">
-                                    <span className="font-bold text-white">
-                                      <span className="text-amber-400 text-sm">{item.quantity}x</span> {item.menu_item_name}
-                                    </span>
-                                  </div>
-                                  {item.special_instructions && (
-                                    <p className="mt-1 rounded-lg bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300 border border-amber-500/20">
-                                      📝 {item.special_instructions}
-                                    </p>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-
-                            {ord.notes && (
-                              <p className="text-[11px] italic text-gray-400 border-t border-gray-800/60 pt-1">
-                                Notes: {ord.notes}
-                              </p>
-                            )}
-
-                            <div className="space-y-1.5 pt-1">
-                              {ord.status === "pending" && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setAcceptingOrderId(ord.id);
-                                    setPrepMinutes(15);
-                                  }}
-                                  disabled={isActionDisabled}
-                                  className="w-full rounded-xl bg-amber-500 py-2 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
-                                >
-                                  Accept Order & Set Prep Time
-                                </button>
-                              )}
-
-                              {ord.status === "accepted" && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleStartPreparing(ord.id)}
-                                  disabled={isActionDisabled}
-                                  className="w-full rounded-xl bg-blue-500 py-2 text-xs font-bold text-white hover:bg-blue-400 transition"
-                                >
-                                  ▶️ Start Preparing
-                                </button>
-                              )}
-
-                              {ord.status === "preparing" && (
-                                <div className="grid grid-cols-2 gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleMarkReady(ord.id)}
-                                    disabled={isActionDisabled}
-                                    className="rounded-xl bg-emerald-500 py-2 text-xs font-bold text-gray-950 hover:bg-emerald-400 transition col-span-2"
-                                  >
-                                    🔔 Mark Ready
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handlePause(ord.id)}
-                                    disabled={isActionDisabled}
-                                    className="rounded-xl bg-gray-800 py-1.5 text-[10px] font-semibold text-gray-300 hover:bg-gray-700 transition"
-                                  >
-                                    ⏸️ Pause
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setUpdatingTimeOrderId(ord.id);
-                                      setPrepMinutes(ord.estimated_prep_minutes || 15);
-                                    }}
-                                    disabled={isActionDisabled}
-                                    className="rounded-xl bg-gray-800 py-1.5 text-[10px] font-semibold text-gray-300 hover:bg-gray-700 transition"
-                                  >
-                                    ⏱️ Edit Time
-                                  </button>
-                                </div>
-                              )}
-
-                              {ord.status === "ready" && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleMarkCompleted(ord.id)}
-                                  disabled={isActionDisabled}
-                                  className="w-full rounded-xl bg-purple-600 py-2 text-xs font-bold text-white hover:bg-purple-500 transition"
-                                >
-                                  ✓ Mark Served
-                                </button>
-                              )}
-
-                              {ord.status === "paused" && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleResume(ord.id)}
-                                  disabled={isActionDisabled}
-                                  className="w-full rounded-xl bg-amber-500 py-2 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
-                                >
-                                  ▶️ Resume Order
-                                </button>
-                              )}
-
-                              {isManager && !isDone && (
-                                <div className="flex items-center justify-between pt-1 text-[10px]">
-                                  <span className="text-gray-400 font-semibold">Priority:</span>
-                                  <select
-                                    value={ord.priority}
-                                    onChange={(e) =>
-                                      handleUpdatePriority(ord.id, e.target.value as "normal" | "high" | "urgent")
-                                    }
-                                    className="rounded-lg bg-gray-900 px-2 py-0.5 text-white border border-gray-700 focus:outline-none"
-                                  >
-                                    <option value="normal">Normal</option>
-                                    <option value="high">High</option>
-                                    <option value="urgent">Urgent</option>
-                                  </select>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {orders.length === 0 ? (
-              <div className="col-span-full rounded-2xl border border-gray-800 bg-gray-900 p-12 text-center text-sm text-gray-500">
-                No active kitchen orders. Standby for incoming customer orders!
-              </div>
-            ) : (
-              orders.map((ord) => {
-                const isActionDisabled = actionLoading === ord.id;
-
-                const isDone = ["completed", "served", "cancelled"].includes(ord.status);
-
-                return (
-                  <div
-                    key={ord.id}
-                    className={`flex flex-col justify-between overflow-hidden rounded-2xl border transition shadow-xl ${
-                      isDone
-                        ? "border-gray-700/50 bg-gray-950/60 opacity-70"
-                        : ord.is_delayed
-                        ? "border-red-500/50 bg-red-950/20 ring-1 ring-red-500/40"
-                        : ord.status === "pending"
-                        ? "border-amber-500/40 bg-gray-900"
-                        : ord.status === "ready"
-                        ? "border-emerald-500/40 bg-emerald-950/10"
-                        : "border-gray-800 bg-gray-900"
-                    }`}
-                  >
-                    <div>
-                      {ord.is_delayed && (
-                        <div className="bg-red-500/20 px-4 py-2 border-b border-red-500/30 text-center text-xs font-black text-red-400 animate-pulse">
-                          ⚠️ DELAYED — Exceeded Estimated Preparation Time
+                    {/* Order Details & Items */}
+                    <div className="p-5 space-y-4">
+                      {ord.estimated_prep_minutes && (
+                        <div className="flex items-center justify-between text-xs rounded-xl bg-gray-950 p-2.5 border border-gray-800">
+                          <span className="text-gray-400">Est. Prep Time:</span>
+                          <span className="font-bold text-emerald-400">{ord.estimated_prep_minutes} minutes</span>
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between border-b border-gray-800 bg-gray-950 px-5 py-3">
-                        <div>
-                          <span className="font-mono text-sm font-bold text-amber-400">{ord.order_number}</span>
-                          <p className="text-[11px] text-gray-400">
-                            Table {ord.table_number || "Walk-in"} • {ord.guest_count || 1} Guests
-                          </p>
-                        </div>
-
-                        <div className="flex flex-col items-end gap-1">
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ring-1 ${
-                              ord.priority === "urgent"
-                                ? "bg-red-500/20 text-red-300 ring-red-500/40 animate-pulse"
-                                : ord.priority === "high"
-                                ? "bg-orange-500/20 text-orange-300 ring-orange-500/40"
-                                : "bg-gray-800 text-gray-400 ring-gray-700"
-                            }`}
-                          >
-                            {ord.priority}
-                          </span>
-                          <span className="text-[10px] text-gray-400 font-mono">
-                            ⏱️ Elapsed: {formatElapsed(ord.elapsed_seconds ?? 0)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-5 space-y-4">
-                        {ord.estimated_prep_minutes && (
-                          <div className="flex items-center justify-between text-xs rounded-xl bg-gray-950 p-2.5 border border-gray-800">
-                            <span className="text-gray-400">Est. Prep Time:</span>
-                            <span className="font-bold text-emerald-400">{ord.estimated_prep_minutes} minutes</span>
-                          </div>
-                        )}
-
-                        <div className="space-y-3 divide-y divide-gray-800/60">
-                          {ord.items.map((item) => (
-                            <div key={item.id} className="pt-2 text-xs">
-                              <div className="flex justify-between items-start">
-                                <span className="font-bold text-white">
-                                  <span className="text-amber-400 text-sm">{item.quantity}x</span> {item.menu_item_name}
-                                </span>
-                              </div>
-                              {item.special_instructions && (
-                                <p className="mt-1 rounded-lg bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-300 border border-amber-500/20">
-                                  📝 {item.special_instructions}
-                                </p>
-                              )}
+                      {/* Itemized List */}
+                      <div className="space-y-3 divide-y divide-gray-800/60">
+                        {ord.items.map((item) => (
+                          <div key={item.id} className="pt-2 text-xs">
+                            <div className="flex justify-between items-start">
+                              <span className="font-bold text-white">
+                                <span className="text-amber-400 text-sm">{item.quantity}x</span> {item.menu_item_name}
+                              </span>
                             </div>
-                          ))}
-                        </div>
-
-                        {ord.notes && (
-                          <p className="text-xs italic text-gray-400 border-t border-gray-800 pt-2">
-                            Notes: {ord.notes}
-                          </p>
-                        )}
+                            {item.special_instructions && (
+                              <p className="mt-1 rounded-lg bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-300 border border-amber-500/20">
+                                📝 {item.special_instructions}
+                              </p>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    </div>
 
-                    <div className="space-y-2 border-t border-gray-800 bg-gray-950 p-4">
-                      {ord.status === "pending" && (
+                      {ord.notes && (
+                        <p className="text-xs italic text-gray-400 border-t border-gray-800 pt-2">
+                          Notes: {ord.notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* KDS Action Buttons */}
+                  <div className="space-y-2 border-t border-gray-800 bg-gray-950 p-4">
+                    {ord.status === "pending" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAcceptingOrderId(ord.id);
+                          setPrepMinutes(15);
+                        }}
+                        disabled={isActionDisabled}
+                        className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
+                      >
+                        Accept Order & Set Prep Time
+                      </button>
+                    )}
+
+                    {ord.status === "accepted" && (
+                      <button
+                        type="button"
+                        onClick={() => handleStartPreparing(ord.id)}
+                        disabled={isActionDisabled}
+                        className="w-full rounded-xl bg-blue-500 py-3 text-xs font-bold text-white hover:bg-blue-400 transition"
+                      >
+                        ▶️ Start Preparing
+                      </button>
+                    )}
+
+                    {ord.status === "preparing" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleMarkReady(ord.id)}
+                          disabled={isActionDisabled}
+                          className="rounded-xl bg-emerald-500 py-2.5 text-xs font-bold text-gray-950 hover:bg-emerald-400 transition col-span-2"
+                        >
+                          🔔 Mark Order Ready
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePause(ord.id)}
+                          disabled={isActionDisabled}
+                          className="rounded-xl bg-gray-800 py-2 text-[11px] font-semibold text-gray-300 hover:bg-gray-700 transition"
+                        >
+                          ⏸️ Pause
+                        </button>
                         <button
                           type="button"
                           onClick={() => {
-                            setAcceptingOrderId(ord.id);
-                            setPrepMinutes(15);
+                            setUpdatingTimeOrderId(ord.id);
+                            setPrepMinutes(ord.estimated_prep_minutes || 15);
                           }}
                           disabled={isActionDisabled}
-                          className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
+                          className="rounded-xl bg-gray-800 py-2 text-[11px] font-semibold text-gray-300 hover:bg-gray-700 transition"
                         >
-                          Accept Order & Set Prep Time
+                          ⏱️ Edit Time
                         </button>
-                      )}
+                      </div>
+                    )}
 
-                      {ord.status === "accepted" && (
-                        <button
-                          type="button"
-                          onClick={() => handleStartPreparing(ord.id)}
-                          disabled={isActionDisabled}
-                          className="w-full rounded-xl bg-blue-500 py-3 text-xs font-bold text-white hover:bg-blue-400 transition"
+                    {ord.status === "ready" && (
+                      <button
+                        type="button"
+                        onClick={() => handleMarkCompleted(ord.id)}
+                        disabled={isActionDisabled}
+                        className="w-full rounded-xl bg-purple-600 py-3 text-xs font-bold text-white hover:bg-purple-500 transition"
+                      >
+                        ✓ Mark Served & Completed
+                      </button>
+                    )}
+
+                    {ord.status === "paused" && (
+                      <button
+                        type="button"
+                        onClick={() => handleResume(ord.id)}
+                        disabled={isActionDisabled}
+                        className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
+                      >
+                        ▶️ Resume Order
+                      </button>
+                    )}
+
+                    {/* Manager Priority Control — only for in-flight orders */}
+                    {isManager && !isDone && (
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-800/80 text-[10px]">
+                        <span className="text-gray-400 font-semibold">Priority:</span>
+                        <select
+                          value={ord.priority}
+                          onChange={(e) =>
+                            handleUpdatePriority(ord.id, e.target.value as "normal" | "high" | "urgent")
+                          }
+                          className="rounded-lg bg-gray-900 px-2 py-1 text-white border border-gray-700 focus:outline-none"
                         >
-                          ▶️ Start Preparing
-                        </button>
-                      )}
+                          <option value="normal">Normal</option>
+                          <option value="high">High</option>
+                          <option value="urgent">Urgent</option>
+                        </select>
+                      </div>
+                    )}
 
-                      {ord.status === "preparing" && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleMarkReady(ord.id)}
-                            disabled={isActionDisabled}
-                            className="rounded-xl bg-emerald-500 py-2.5 text-xs font-bold text-gray-950 hover:bg-emerald-400 transition col-span-2"
-                          >
-                            🔔 Mark Order Ready
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handlePause(ord.id)}
-                            disabled={isActionDisabled}
-                            className="rounded-xl bg-gray-800 py-2 text-[11px] font-semibold text-gray-300 hover:bg-gray-700 transition"
-                          >
-                            ⏸️ Pause
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setUpdatingTimeOrderId(ord.id);
-                              setPrepMinutes(ord.estimated_prep_minutes || 15);
-                            }}
-                            disabled={isActionDisabled}
-                            className="rounded-xl bg-gray-800 py-2 text-[11px] font-semibold text-gray-300 hover:bg-gray-700 transition"
-                          >
-                            ⏱️ Edit Time
-                          </button>
-                        </div>
-                      )}
-
-                      {ord.status === "ready" && (
-                        <button
-                          type="button"
-                          onClick={() => handleMarkCompleted(ord.id)}
-                          disabled={isActionDisabled}
-                          className="w-full rounded-xl bg-purple-600 py-3 text-xs font-bold text-white hover:bg-purple-500 transition"
-                        >
-                          ✓ Mark Served & Completed
-                        </button>
-                      )}
-
-                      {ord.status === "paused" && (
-                        <button
-                          type="button"
-                          onClick={() => handleResume(ord.id)}
-                          disabled={isActionDisabled}
-                          className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
-                        >
-                          ▶️ Resume Order
-                        </button>
-                      )}
-
-                      {isManager && !isDone && (
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-800/80 text-[10px]">
-                          <span className="text-gray-400 font-semibold">Priority:</span>
-                          <select
-                            value={ord.priority}
-                            onChange={(e) =>
-                              handleUpdatePriority(ord.id, e.target.value as "normal" | "high" | "urgent")
-                            }
-                            className="rounded-lg bg-gray-900 px-2 py-1 text-white border border-gray-700 focus:outline-none"
-                          >
-                            <option value="normal">Normal</option>
-                            <option value="high">High</option>
-                            <option value="urgent">Urgent</option>
-                          </select>
-                        </div>
-                      )}
-
-                      {isDone && (
-                        <div className={`rounded-xl py-2 text-center text-xs font-bold ${
-                          ord.status === "cancelled"
-                            ? "bg-red-900/30 text-red-400"
-                            : "bg-emerald-900/30 text-emerald-400"
-                        }`}>
-                          {ord.status === "cancelled" ? "❌ Cancelled" : ord.status === "served" ? "✅ Served" : "✅ Completed"}
-                        </div>
-                      )}
-                    </div>
+                    {/* Completed / Served / Cancelled badge */}
+                    {isDone && (
+                      <div className={`rounded-xl py-2 text-center text-xs font-bold ${
+                        ord.status === "cancelled"
+                          ? "bg-red-900/30 text-red-400"
+                          : "bg-emerald-900/30 text-emerald-400"
+                      }`}>
+                        {ord.status === "cancelled" ? "❌ Cancelled" : ord.status === "served" ? "✅ Served" : "✅ Completed"}
+                      </div>
+                    )}
                   </div>
-                );
-              })
-            )}
-          </div>
-        )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* ACCEPT ORDER MODAL */}
