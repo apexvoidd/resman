@@ -31,6 +31,11 @@ function KitchenDashboardPage() {
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [sortBy, setSortBy] = useState<"oldest" | "newest" | "longest_waiting">("oldest");
+  const [layoutMode, setLayoutMode] = useState<"kanban" | "grid">("kanban");
+
+  // Drag & Drop State
+  const [draggedOrderId, setDraggedOrderId] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
   // Double click protection & modal state
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -41,6 +46,45 @@ function KitchenDashboardPage() {
   const isAuthorized =
     hasRole("kitchen", "kitchen_staff", "chef", "manager", "admin");
   const isManager = hasRole("manager") || hasRole("admin");
+
+  const handleDropToStatus = async (targetStatus: string) => {
+    if (!draggedOrderId) return;
+    const orderId = draggedOrderId;
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+    if (order.status === targetStatus) return;
+
+    try {
+      setActionLoading(orderId);
+      const token = await getToken();
+      if (!token) return;
+
+      if (targetStatus === "accepted") {
+        setAcceptingOrderId(orderId);
+        setPrepMinutes(order.estimated_prep_minutes || 15);
+      } else if (targetStatus === "preparing") {
+        if (order.status === "pending") {
+          await acceptOrder(token, orderId, 15);
+        }
+        await startPreparing(token, orderId);
+        toast.success(`Order #${order.order_number} moved to Preparing!`, "👨‍🍳 Kitchen Preparing");
+      } else if (targetStatus === "ready") {
+        await markOrderReady(token, orderId);
+        toast.success(`Order #${order.order_number} marked Ready!`, "🔔 Order Ready");
+      } else if (targetStatus === "completed") {
+        await markOrderCompleted(token, orderId);
+        toast.success(`Order #${order.order_number} Completed & Served!`, "✅ Order Served");
+      }
+      await loadKDSData();
+    } catch (err: unknown) {
+      const e = err as Error;
+      toast.error(e.message || "Failed to update order status.", "KDS Error");
+    } finally {
+      setActionLoading(null);
+      setDraggedOrderId(null);
+      setDragOverColumn(null);
+    }
+  };
 
   const loadKDSData = async () => {
     try {
@@ -336,230 +380,436 @@ function KitchenDashboardPage() {
             ))}
           </div>
 
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as "oldest" | "newest" | "longest_waiting")}
-            className="rounded-xl bg-gray-950 px-3 py-2 text-xs text-white ring-1 ring-white/10 focus:outline-none"
-          >
-            <option value="oldest">Sort: Oldest Order (FIFO)</option>
-            <option value="newest">Sort: Newest Order</option>
-            <option value="longest_waiting">Sort: Longest Waiting</option>
-          </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 bg-gray-950 p-1 rounded-xl border border-gray-800">
+              <button
+                type="button"
+                onClick={() => setLayoutMode("kanban")}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${
+                  layoutMode === "kanban"
+                    ? "bg-amber-500 text-gray-950 shadow"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                📋 Drag & Drop Board
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayoutMode("grid")}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${
+                  layoutMode === "grid"
+                    ? "bg-amber-500 text-gray-950 shadow"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                📦 Grid View
+              </button>
+            </div>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as "oldest" | "newest" | "longest_waiting")}
+              className="rounded-xl bg-gray-950 px-3 py-2 text-xs text-white ring-1 ring-white/10 focus:outline-none"
+            >
+              <option value="oldest">Sort: Oldest Order (FIFO)</option>
+              <option value="newest">Sort: Newest Order</option>
+              <option value="longest_waiting">Sort: Longest Waiting</option>
+            </select>
+          </div>
         </div>
 
-        {/* Active Order Cards Grid */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {orders.length === 0 ? (
-            <div className="col-span-full rounded-2xl border border-gray-800 bg-gray-900 p-12 text-center text-sm text-gray-500">
-              No active kitchen orders. Standby for incoming customer orders!
-            </div>
-          ) : (
-            orders.map((ord) => {
-              const isActionDisabled = actionLoading === ord.id;
-
-              const isDone = ["completed", "served", "cancelled"].includes(ord.status);
+        {/* KDS Main View: Kanban Board vs Grid View */}
+        {layoutMode === "kanban" ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-start">
+            {[
+              { id: "pending", title: "Pending", icon: "🟧", color: "border-amber-500/40 bg-amber-500/10 text-amber-400" },
+              { id: "accepted", title: "Accepted", icon: "🟦", color: "border-blue-500/40 bg-blue-500/10 text-blue-400" },
+              { id: "preparing", title: "Preparing", icon: "👨‍🍳", color: "border-indigo-500/40 bg-indigo-500/10 text-indigo-400" },
+              { id: "ready", title: "Ready to Serve", icon: "🔔", color: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" },
+            ].map((col) => {
+              const colOrders = orders.filter((o) => o.status === col.id);
 
               return (
                 <div
-                  key={ord.id}
-                  className={`flex flex-col justify-between overflow-hidden rounded-2xl border transition shadow-xl ${
-                    isDone
-                      ? "border-gray-700/50 bg-gray-950/60 opacity-70"
-                      : ord.is_delayed
-                      ? "border-red-500/50 bg-red-950/20 ring-1 ring-red-500/40"
-                      : ord.status === "pending"
-                      ? "border-amber-500/40 bg-gray-900"
-                      : ord.status === "ready"
-                      ? "border-emerald-500/40 bg-emerald-950/10"
-                      : "border-gray-800 bg-gray-900"
+                  key={col.id}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (dragOverColumn !== col.id) setDragOverColumn(col.id);
+                  }}
+                  onDragLeave={() => setDragOverColumn(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleDropToStatus(col.id);
+                  }}
+                  className={`flex flex-col rounded-2xl border p-3.5 transition min-h-[550px] ${
+                    dragOverColumn === col.id
+                      ? "border-amber-400 bg-amber-500/10 ring-2 ring-amber-500/40"
+                      : "border-gray-800 bg-gray-900/60"
                   }`}
                 >
-                  <div>
-                    {/* Delayed Warning Banner */}
-                    {ord.is_delayed && (
-                      <div className="bg-red-500/20 px-4 py-2 border-b border-red-500/30 text-center text-xs font-black text-red-400 animate-pulse">
-                        ⚠️ DELAYED — Exceeded Estimated Preparation Time
-                      </div>
-                    )}
-
-                    {/* Card Header */}
-                    <div className="flex items-center justify-between border-b border-gray-800 bg-gray-950 px-5 py-3">
-                      <div>
-                        <span className="font-mono text-sm font-bold text-amber-400">{ord.order_number}</span>
-                        <p className="text-[11px] text-gray-400">
-                          Table {ord.table_number || "Walk-in"} • {ord.guest_count || 1} Guests
-                        </p>
-                      </div>
-
-                      {/* Priority Badge */}
-                      <div className="flex flex-col items-end gap-1">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ring-1 ${
-                            ord.priority === "urgent"
-                              ? "bg-red-500/20 text-red-300 ring-red-500/40 animate-pulse"
-                              : ord.priority === "high"
-                              ? "bg-orange-500/20 text-orange-300 ring-orange-500/40"
-                              : "bg-gray-800 text-gray-400 ring-gray-700"
-                          }`}
-                        >
-                          {ord.priority}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-mono">
-                          ⏱️ Elapsed: {formatElapsed(ord.elapsed_seconds ?? 0)}
-                        </span>
-                      </div>
+                  {/* Column Header */}
+                  <div className="flex items-center justify-between border-b border-gray-800/80 pb-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{col.icon}</span>
+                      <h3 className="font-bold text-white text-xs sm:text-sm">{col.title}</h3>
                     </div>
-
-                    {/* Order Details & Items */}
-                    <div className="p-5 space-y-4">
-                      {ord.estimated_prep_minutes && (
-                        <div className="flex items-center justify-between text-xs rounded-xl bg-gray-950 p-2.5 border border-gray-800">
-                          <span className="text-gray-400">Est. Prep Time:</span>
-                          <span className="font-bold text-emerald-400">{ord.estimated_prep_minutes} minutes</span>
-                        </div>
-                      )}
-
-                      {/* Itemized List */}
-                      <div className="space-y-3 divide-y divide-gray-800/60">
-                        {ord.items.map((item) => (
-                          <div key={item.id} className="pt-2 text-xs">
-                            <div className="flex justify-between items-start">
-                              <span className="font-bold text-white">
-                                <span className="text-amber-400 text-sm">{item.quantity}x</span> {item.menu_item_name}
-                              </span>
-                            </div>
-                            {item.special_instructions && (
-                              <p className="mt-1 rounded-lg bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-300 border border-amber-500/20">
-                                📝 {item.special_instructions}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {ord.notes && (
-                        <p className="text-xs italic text-gray-400 border-t border-gray-800 pt-2">
-                          Notes: {ord.notes}
-                        </p>
-                      )}
-                    </div>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-black border ${col.color}`}>
+                      {colOrders.length}
+                    </span>
                   </div>
 
-                  {/* KDS Action Buttons */}
-                  <div className="space-y-2 border-t border-gray-800 bg-gray-950 p-4">
-                    {ord.status === "pending" && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAcceptingOrderId(ord.id);
-                          setPrepMinutes(15);
-                        }}
-                        disabled={isActionDisabled}
-                        className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
-                      >
-                        Accept Order & Set Prep Time
-                      </button>
-                    )}
-
-                    {ord.status === "accepted" && (
-                      <button
-                        type="button"
-                        onClick={() => handleStartPreparing(ord.id)}
-                        disabled={isActionDisabled}
-                        className="w-full rounded-xl bg-blue-500 py-3 text-xs font-bold text-white hover:bg-blue-400 transition"
-                      >
-                        ▶️ Start Preparing
-                      </button>
-                    )}
-
-                    {ord.status === "preparing" && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleMarkReady(ord.id)}
-                          disabled={isActionDisabled}
-                          className="rounded-xl bg-emerald-500 py-2.5 text-xs font-bold text-gray-950 hover:bg-emerald-400 transition col-span-2"
-                        >
-                          🔔 Mark Order Ready
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handlePause(ord.id)}
-                          disabled={isActionDisabled}
-                          className="rounded-xl bg-gray-800 py-2 text-[11px] font-semibold text-gray-300 hover:bg-gray-700 transition"
-                        >
-                          ⏸️ Pause
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUpdatingTimeOrderId(ord.id);
-                            setPrepMinutes(ord.estimated_prep_minutes || 15);
-                          }}
-                          disabled={isActionDisabled}
-                          className="rounded-xl bg-gray-800 py-2 text-[11px] font-semibold text-gray-300 hover:bg-gray-700 transition"
-                        >
-                          ⏱️ Edit Time
-                        </button>
+                  {/* Orders in Column */}
+                  <div className="space-y-3.5 flex-1">
+                    {colOrders.length === 0 ? (
+                      <div className="flex h-36 items-center justify-center rounded-xl border border-dashed border-gray-800/80 p-4 text-center text-xs text-gray-500">
+                        Drag & Drop order cards here to move to {col.title}
                       </div>
-                    )}
+                    ) : (
+                      colOrders.map((ord) => {
+                        const isActionDisabled = actionLoading === ord.id;
+                        const isDone = ["completed", "served", "cancelled"].includes(ord.status);
 
-                    {ord.status === "ready" && (
-                      <button
-                        type="button"
-                        onClick={() => handleMarkCompleted(ord.id)}
-                        disabled={isActionDisabled}
-                        className="w-full rounded-xl bg-purple-600 py-3 text-xs font-bold text-white hover:bg-purple-500 transition"
-                      >
-                        ✓ Mark Served & Completed
-                      </button>
-                    )}
+                        return (
+                          <div
+                            key={ord.id}
+                            draggable={!isActionDisabled}
+                            onDragStart={() => setDraggedOrderId(ord.id)}
+                            onDragEnd={() => setDraggedOrderId(null)}
+                            className={`group cursor-grab active:cursor-grabbing flex flex-col justify-between overflow-hidden rounded-xl border transition shadow-lg ${
+                              draggedOrderId === ord.id ? "opacity-40 scale-95" : ""
+                            } ${
+                              ord.is_delayed
+                                ? "border-red-500/50 bg-red-950/20 ring-1 ring-red-500/40"
+                                : ord.status === "pending"
+                                ? "border-amber-500/40 bg-gray-900"
+                                : ord.status === "ready"
+                                ? "border-emerald-500/40 bg-emerald-950/20"
+                                : "border-gray-800 bg-gray-900 hover:border-gray-700"
+                            }`}
+                          >
+                            {/* Card Content */}
+                            <div>
+                              {ord.is_delayed && (
+                                <div className="bg-red-500/20 px-3 py-1 border-b border-red-500/30 text-center text-[10px] font-black text-red-400 animate-pulse">
+                                  ⚠️ DELAYED PREP
+                                </div>
+                              )}
 
-                    {ord.status === "paused" && (
-                      <button
-                        type="button"
-                        onClick={() => handleResume(ord.id)}
-                        disabled={isActionDisabled}
-                        className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
-                      >
-                        ▶️ Resume Order
-                      </button>
-                    )}
+                              <div className="flex items-center justify-between border-b border-gray-800 bg-gray-950 px-3.5 py-2.5">
+                                <div>
+                                  <span className="font-mono text-xs font-bold text-amber-400">{ord.order_number}</span>
+                                  <p className="text-[10px] text-gray-400">
+                                    Table {ord.table_number || "Walk-in"} • {ord.guest_count || 1} Guests
+                                  </p>
+                                </div>
 
-                    {/* Manager Priority Control — only for in-flight orders */}
-                    {isManager && !isDone && (
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-800/80 text-[10px]">
-                        <span className="text-gray-400 font-semibold">Priority:</span>
-                        <select
-                          value={ord.priority}
-                          onChange={(e) =>
-                            handleUpdatePriority(ord.id, e.target.value as "normal" | "high" | "urgent")
-                          }
-                          className="rounded-lg bg-gray-900 px-2 py-1 text-white border border-gray-700 focus:outline-none"
-                        >
-                          <option value="normal">Normal</option>
-                          <option value="high">High</option>
-                          <option value="urgent">Urgent</option>
-                        </select>
-                      </div>
-                    )}
+                                <div className="flex flex-col items-end gap-0.5">
+                                  {ord.priority !== "normal" && (
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ring-1 ${
+                                        ord.priority === "urgent"
+                                          ? "bg-red-500/20 text-red-300 ring-red-500/40 animate-pulse"
+                                          : "bg-orange-500/20 text-orange-300 ring-orange-500/40"
+                                      }`}
+                                    >
+                                      {ord.priority}
+                                    </span>
+                                  )}
+                                  <span className="text-[9px] text-gray-400 font-mono">
+                                    ⏱️ {formatElapsed(ord.elapsed_seconds ?? 0)}
+                                  </span>
+                                </div>
+                              </div>
 
-                    {/* Completed / Served / Cancelled badge */}
-                    {isDone && (
-                      <div className={`rounded-xl py-2 text-center text-xs font-bold ${
-                        ord.status === "cancelled"
-                          ? "bg-red-900/30 text-red-400"
-                          : "bg-emerald-900/30 text-emerald-400"
-                      }`}>
-                        {ord.status === "cancelled" ? "❌ Cancelled" : ord.status === "served" ? "✅ Served" : "✅ Completed"}
-                      </div>
+                              <div className="p-3.5 space-y-3">
+                                {ord.estimated_prep_minutes && (
+                                  <div className="flex items-center justify-between text-[11px] rounded-lg bg-gray-950 px-2.5 py-1.5 border border-gray-800">
+                                    <span className="text-gray-400">Est. Prep:</span>
+                                    <span className="font-bold text-emerald-400">{ord.estimated_prep_minutes} min</span>
+                                  </div>
+                                )}
+
+                                <div className="space-y-2 divide-y divide-gray-800/60 text-xs">
+                                  {ord.items.map((item) => (
+                                    <div key={item.id} className="pt-1.5 first:pt-0">
+                                      <span className="font-bold text-white">
+                                        <span className="text-amber-400 font-extrabold">{item.quantity}x</span> {item.menu_item_name}
+                                      </span>
+                                      {item.special_instructions && (
+                                        <p className="mt-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-300 border border-amber-500/20">
+                                          📝 {item.special_instructions}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="p-3 border-t border-gray-800 bg-gray-950 space-y-1.5">
+                              {ord.status === "pending" && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAcceptingOrderId(ord.id);
+                                    setPrepMinutes(15);
+                                  }}
+                                  disabled={isActionDisabled}
+                                  className="w-full rounded-lg bg-amber-500 py-2 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
+                                >
+                                  Accept Order
+                                </button>
+                              )}
+
+                              {ord.status === "accepted" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartPreparing(ord.id)}
+                                  disabled={isActionDisabled}
+                                  className="w-full rounded-lg bg-blue-500 py-2 text-xs font-bold text-white hover:bg-blue-400 transition"
+                                >
+                                  ▶️ Start Preparing
+                                </button>
+                              )}
+
+                              {ord.status === "preparing" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkReady(ord.id)}
+                                  disabled={isActionDisabled}
+                                  className="w-full rounded-lg bg-emerald-500 py-2 text-xs font-bold text-gray-950 hover:bg-emerald-400 transition"
+                                >
+                                  🔔 Mark Ready
+                                </button>
+                              )}
+
+                              {ord.status === "ready" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkCompleted(ord.id)}
+                                  disabled={isActionDisabled}
+                                  className="w-full rounded-lg bg-purple-600 py-2 text-xs font-bold text-white hover:bg-purple-500 transition"
+                                >
+                                  ✓ Mark Served
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        ) : (
+          /* Grid View Mode */
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {orders.length === 0 ? (
+              <div className="col-span-full rounded-2xl border border-gray-800 bg-gray-900 p-12 text-center text-sm text-gray-500">
+                No active kitchen orders. Standby for incoming customer orders!
+              </div>
+            ) : (
+              orders.map((ord) => {
+                const isActionDisabled = actionLoading === ord.id;
+                const isDone = ["completed", "served", "cancelled"].includes(ord.status);
+
+                return (
+                  <div
+                    key={ord.id}
+                    className={`flex flex-col justify-between overflow-hidden rounded-2xl border transition shadow-xl ${
+                      isDone
+                        ? "border-gray-700/50 bg-gray-950/60 opacity-70"
+                        : ord.is_delayed
+                        ? "border-red-500/50 bg-red-950/20 ring-1 ring-red-500/40"
+                        : ord.status === "pending"
+                        ? "border-amber-500/40 bg-gray-900"
+                        : ord.status === "ready"
+                        ? "border-emerald-500/40 bg-emerald-950/10"
+                        : "border-gray-800 bg-gray-900"
+                    }`}
+                  >
+                    <div>
+                      {ord.is_delayed && (
+                        <div className="bg-red-500/20 px-4 py-2 border-b border-red-500/30 text-center text-xs font-black text-red-400 animate-pulse">
+                          ⚠️ DELAYED — Exceeded Estimated Preparation Time
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between border-b border-gray-800 bg-gray-950 px-5 py-3">
+                        <div>
+                          <span className="font-mono text-sm font-bold text-amber-400">{ord.order_number}</span>
+                          <p className="text-[11px] text-gray-400">
+                            Table {ord.table_number || "Walk-in"} • {ord.guest_count || 1} Guests
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-1">
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ring-1 ${
+                              ord.priority === "urgent"
+                                ? "bg-red-500/20 text-red-300 ring-red-500/40 animate-pulse"
+                                : ord.priority === "high"
+                                ? "bg-orange-500/20 text-orange-300 ring-orange-500/40"
+                                : "bg-gray-800 text-gray-400 ring-gray-700"
+                            }`}
+                          >
+                            {ord.priority}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-mono">
+                            ⏱️ Elapsed: {formatElapsed(ord.elapsed_seconds ?? 0)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-5 space-y-4">
+                        {ord.estimated_prep_minutes && (
+                          <div className="flex items-center justify-between text-xs rounded-xl bg-gray-950 p-2.5 border border-gray-800">
+                            <span className="text-gray-400">Est. Prep Time:</span>
+                            <span className="font-bold text-emerald-400">{ord.estimated_prep_minutes} minutes</span>
+                          </div>
+                        )}
+
+                        <div className="space-y-3 divide-y divide-gray-800/60">
+                          {ord.items.map((item) => (
+                            <div key={item.id} className="pt-2 text-xs">
+                              <div className="flex justify-between items-start">
+                                <span className="font-bold text-white">
+                                  <span className="text-amber-400 text-sm">{item.quantity}x</span> {item.menu_item_name}
+                                </span>
+                              </div>
+                              {item.special_instructions && (
+                                <p className="mt-1 rounded-lg bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-300 border border-amber-500/20">
+                                  📝 {item.special_instructions}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {ord.notes && (
+                          <p className="text-xs italic text-gray-400 border-t border-gray-800 pt-2">
+                            Notes: {ord.notes}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 border-t border-gray-800 bg-gray-950 p-4">
+                      {ord.status === "pending" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAcceptingOrderId(ord.id);
+                            setPrepMinutes(15);
+                          }}
+                          disabled={isActionDisabled}
+                          className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
+                        >
+                          Accept Order & Set Prep Time
+                        </button>
+                      )}
+
+                      {ord.status === "accepted" && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartPreparing(ord.id)}
+                          disabled={isActionDisabled}
+                          className="w-full rounded-xl bg-blue-500 py-3 text-xs font-bold text-white hover:bg-blue-400 transition"
+                        >
+                          ▶️ Start Preparing
+                        </button>
+                      )}
+
+                      {ord.status === "preparing" && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleMarkReady(ord.id)}
+                            disabled={isActionDisabled}
+                            className="rounded-xl bg-emerald-500 py-2.5 text-xs font-bold text-gray-950 hover:bg-emerald-400 transition col-span-2"
+                          >
+                            🔔 Mark Order Ready
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handlePause(ord.id)}
+                            disabled={isActionDisabled}
+                            className="rounded-xl bg-gray-800 py-2 text-[11px] font-semibold text-gray-300 hover:bg-gray-700 transition"
+                          >
+                            ⏸️ Pause
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUpdatingTimeOrderId(ord.id);
+                              setPrepMinutes(ord.estimated_prep_minutes || 15);
+                            }}
+                            disabled={isActionDisabled}
+                            className="rounded-xl bg-gray-800 py-2 text-[11px] font-semibold text-gray-300 hover:bg-gray-700 transition"
+                          >
+                            ⏱️ Edit Time
+                          </button>
+                        </div>
+                      )}
+
+                      {ord.status === "ready" && (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkCompleted(ord.id)}
+                          disabled={isActionDisabled}
+                          className="w-full rounded-xl bg-purple-600 py-3 text-xs font-bold text-white hover:bg-purple-500 transition"
+                        >
+                          ✓ Mark Served & Completed
+                        </button>
+                      )}
+
+                      {ord.status === "paused" && (
+                        <button
+                          type="button"
+                          onClick={() => handleResume(ord.id)}
+                          disabled={isActionDisabled}
+                          className="w-full rounded-xl bg-amber-500 py-3 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
+                        >
+                          ▶️ Resume Order
+                        </button>
+                      )}
+
+                      {isManager && !isDone && (
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-800/80 text-[10px]">
+                          <span className="text-gray-400 font-semibold">Priority:</span>
+                          <select
+                            value={ord.priority}
+                            onChange={(e) =>
+                              handleUpdatePriority(ord.id, e.target.value as "normal" | "high" | "urgent")
+                            }
+                            className="rounded-lg bg-gray-900 px-2 py-1 text-white border border-gray-700 focus:outline-none"
+                          >
+                            <option value="normal">Normal</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {isDone && (
+                        <div className={`rounded-xl py-2 text-center text-xs font-bold ${
+                          ord.status === "cancelled"
+                            ? "bg-red-900/30 text-red-400"
+                            : "bg-emerald-900/30 text-emerald-400"
+                        }`}>
+                          {ord.status === "cancelled" ? "❌ Cancelled" : ord.status === "served" ? "✅ Served" : "✅ Completed"}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
 
       {/* ACCEPT ORDER MODAL */}
