@@ -277,7 +277,7 @@ function WaiterDashboardPage() {
           <section className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-amber-300 flex items-center gap-2">
-                <span>🔔 Real-Time Notifications & Bill Requests</span>
+                <span>🔔 Notifications & Bill Requests</span>
                 <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-black text-gray-950">
                   {notifications.length}
                 </span>
@@ -290,21 +290,22 @@ function WaiterDashboardPage() {
                 ✓ Clear All
               </button>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Fixed-height scrollable list — never grows the page */}
+            <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
               {notifications.map((n) => (
-                <div key={n.id} className="bg-gray-900 border border-amber-500/20 p-4 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-amber-400">{n.title}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleDismissNotification(n.id)}
-                      className="text-gray-500 hover:text-white transition text-base leading-none"
-                      title="Dismiss"
-                    >
-                      ✕
-                    </button>
+                <div key={n.id} className="bg-gray-900 border border-amber-500/20 p-3 rounded-xl flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-amber-400 truncate">{n.title}</p>
+                    <p className="text-xs text-gray-300 mt-0.5">{n.message}</p>
                   </div>
-                  <p className="text-xs text-gray-300">{n.message}</p>
+                  <button
+                    type="button"
+                    onClick={() => handleDismissNotification(n.id)}
+                    className="shrink-0 text-gray-500 hover:text-white transition text-base leading-none mt-0.5"
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
                 </div>
               ))}
             </div>
