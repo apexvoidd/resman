@@ -26,7 +26,7 @@ ResMan OS is a full-stack restaurant management system built for modern dine-in 
 
 ---
 
-> [!TIP]
+> [!NOTE]
 > ### Featured Innovation: AI Manager Assistant (NVIDIA NIM Integration)
 > ResMan OS includes an interactive **AI Manager Assistant** built directly into the Executive Hub. Powered by the **NVIDIA NIM API** (Meta Llama 3.1 70B Instruct) with a real-time PostgreSQL database context engine:
 > - **Natural Language Operational Queries**: Ask about daily revenue, low-stock inventory, table occupancy rates, active kitchen orders, and dish profit margins.
@@ -44,7 +44,7 @@ ResMan OS is a full-stack restaurant management system built for modern dine-in 
 
 You can test the entire real-time restaurant lifecycle on **a single device using side-by-side browser tabs** or **two separate devices** (e.g. smartphone for customer + laptop for staff).
 
-> [!NOTE]
+> [!TIP]
 > **Pro-Tip for Testers**:
 > - **Public Guest Access**: Customer check-in (`/join`), digital menu (`/join/menu`), payment pages (`/billing/[billId]`), and dish reviews (`/reviews/submit`) do **not** require login.
 > - **Staff Role Access**: Staff dashboards (`/waiter/dashboard`, `/kitchen/dashboard`, `/cleaning/dashboard`, `/cashier`, `/manager/dashboard`) require signing in via `/sign-in`.
