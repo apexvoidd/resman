@@ -305,11 +305,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-200 ml-0 ${
+        className={`flex-1 flex flex-col min-w-0 h-screen overflow-hidden transition-all duration-200 ml-0 ${
           collapsed ? "md:ml-16" : "md:ml-60"
         }`}
       >
-        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[#334155] bg-[#0F172A]/95 px-4 sm:px-6 backdrop-blur-md">
+        <header className="flex h-14 items-center justify-between border-b border-[#334155] bg-[#0F172A]/95 px-4 sm:px-6 backdrop-blur-md shrink-0">
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setMobileOpen(true)}
@@ -345,16 +345,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <span className="hidden lg:inline text-[11px] font-semibold text-[#2563EB] bg-[#2563EB]/10 border border-[#2563EB]/20 px-2.5 py-1 rounded-md">
               {primaryRole} Mode
             </span>
-            <Link
-              href="/cashier"
-              className="px-3 py-1 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs transition"
-            >
-              💵 Register
-            </Link>
           </div>
         </header>
 
-        <main className="flex-1 p-3 sm:p-6 lg:p-8 bg-[#0F172A] text-[#F8FAFC]">{children}</main>
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 bg-[#0F172A] text-[#F8FAFC] overflow-y-auto">{children}</main>
         <AIChatDrawer />
       </div>
     </div>
