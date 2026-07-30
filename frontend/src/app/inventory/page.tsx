@@ -425,34 +425,7 @@ function InventoryPage() {
           </div>
         )}
 
-        {/* Main Tab Bar */}
-        <div className="flex border-b border-gray-800">
-          <button
-            type="button"
-            onClick={() => setActiveTab("inventory")}
-            className={`px-5 py-3 text-xs font-bold border-b-2 transition ${
-              activeTab === "inventory"
-                ? "border-amber-500 text-amber-400"
-                : "border-transparent text-gray-400 hover:text-white"
-            }`}
-          >
-            📦 Inventory Items ({ingredients.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("history")}
-            className={`px-5 py-3 text-xs font-bold border-b-2 transition ${
-              activeTab === "history"
-                ? "border-amber-500 text-amber-400"
-                : "border-transparent text-gray-400 hover:text-white"
-            }`}
-          >
-            📜 Stock Audit History
-          </button>
-        </div>
-
-        {activeTab === "inventory" ? (
-          <div className="space-y-4">
+        <div className="space-y-4">
             {/* Filter & Search Bar */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 rounded-2xl border border-gray-800 bg-gray-900 p-4">
               <input
@@ -655,79 +628,6 @@ function InventoryPage() {
               </div>
             </div>
           </div>
-        ) : (
-          /* Stock Audit History Tab */
-          <div className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-900 shadow-xl">
-            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">Stock Change History Audit Trail</h3>
-              <button
-                type="button"
-                onClick={loadHistory}
-                className="rounded-xl bg-gray-800 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700"
-              >
-                🔄 Refresh History
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-gray-800 bg-gray-950 text-gray-400 font-semibold">
-                  <tr>
-                    <th className="px-5 py-3.5">Timestamp</th>
-                    <th className="px-4 py-3.5">Ingredient</th>
-                    <th className="px-4 py-3.5">Action Type</th>
-                    <th className="px-4 py-3.5">Prev Stock</th>
-                    <th className="px-4 py-3.5">Change</th>
-                    <th className="px-4 py-3.5">New Stock</th>
-                    <th className="px-4 py-3.5">Reason / Invoice</th>
-                    <th className="px-5 py-3.5">Recorded By</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800/60">
-                  {stockHistory.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="p-8 text-center text-gray-500">
-                        No audit history records available.
-                      </td>
-                    </tr>
-                  ) : (
-                    stockHistory.map((h) => (
-                      <tr key={h.id} className="hover:bg-gray-800/40 transition">
-                        <td className="px-5 py-3.5 text-gray-400 font-mono whitespace-nowrap">
-                          {new Date(h.created_at).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3.5 font-bold text-white">{h.ingredient_name || "Ingredient"}</td>
-                        <td className="px-4 py-3.5 uppercase font-mono text-[10px]">
-                          <span
-                            className={`rounded-full px-2 py-0.5 font-black ring-1 ${
-                              h.action_type === "restock"
-                                ? "bg-emerald-500/20 text-emerald-300 ring-emerald-500/40"
-                                : h.action_type === "waste" || h.action_type === "adjustment_decrease"
-                                ? "bg-red-500/20 text-red-300 ring-red-500/40"
-                                : "bg-blue-500/20 text-blue-300 ring-blue-500/40"
-                            }`}
-                          >
-                            {h.action_type}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 font-mono text-gray-400">{h.previous_quantity}</td>
-                        <td className="px-4 py-3.5 font-mono font-bold">
-                          <span className={h.change_amount >= 0 ? "text-emerald-400" : "text-red-400"}>
-                            {h.change_amount >= 0 ? `+${h.change_amount}` : h.change_amount}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 font-mono font-bold text-white">{h.new_quantity}</td>
-                        <td className="px-4 py-3.5 text-gray-300">
-                          {h.reason || h.invoice_number || "—"}
-                        </td>
-                        <td className="px-5 py-3.5 text-gray-400">{h.recorded_by_name || "System"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ADD / EDIT INGREDIENT MODAL */}
