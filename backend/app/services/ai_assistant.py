@@ -296,7 +296,7 @@ async def process_ai_chat(
                     
             messages.append({"role": "user", "content": message})
 
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=45.0) as client:
                 response = await client.post(
                     f"{NVIDIA_NIM_BASE_URL}/chat/completions",
                     headers={
@@ -320,7 +320,7 @@ async def process_ai_chat(
                 else:
                     logger.warning(f"⚠️ NVIDIA NIM API returned status {response.status_code}: {response.text}")
         except Exception as e:
-            logger.error(f"❌ NVIDIA NIM API call failed with exception: {e}")
+            logger.error(f"❌ NVIDIA NIM API call failed [{type(e).__name__}]: {e}")
 
     # 4. Fallback synthesis if NIM call did not execute or failed
     if not reply_text:
