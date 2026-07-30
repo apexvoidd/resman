@@ -29,59 +29,24 @@ logger = logging.getLogger("app.services.ai_assistant")
 NVIDIA_NIM_BASE_URL = os.getenv("NVIDIA_NIM_BASE_URL", "https://integrate.api.nvidia.com/v1")
 NVIDIA_NIM_MODEL = os.getenv("NVIDIA_NIM_MODEL", "meta/llama-3.1-70b-instruct")
 
-RESTAURANT_KEYWORDS = {
-    "order", "orders", "revenue", "sale", "sales", "bill", "billing", "payment",
-    "table", "tables", "occupancy", "seat", "seated", "kitchen", "kds", "prep",
-    "preparation", "cook", "chef", "food", "menu", "dish", "dishes", "item", "items",
-    "inventory", "stock", "ingredient", "ingredients", "waste", "wastage",
-    "recipe", "recipes", "profit", "margin", "cost", "price", "pricing",
-    "staff", "waiter", "cashier", "cleaner", "employee", "review", "csat",
-    "rating", "customer", "customers", "overview", "summary", "kpi", "performance",
-    "restaurant", "resman", "today", "operating", "hours", "shift"
-}
+# Hard blocklist — only used by the fallback engine (no NIM key).
+# When the NIM LLM is active, the system prompt handles all domain enforcement.
+# Keep this list small: only topics that are obviously 100% unrelated to restaurants.
+HARD_BLOCKLIST = [
+    "write code", "debug", "programming", "python script", "javascript",
+    "weather", "forecast", "temperature outside",
+    "sports", "cricket", "football", "ipl", "match score",
+    "write a poem", "write a story", "tell me a joke",
+    "politics", "election", "government",
+    "stock market", "crypto", "bitcoin", "nifty", "sensex",
+    "movie", "netflix", "series", "song lyrics",
+]
 
 
-# Short contextual follow-ups that are valid within an ongoing conversation
-CONTEXTUAL_FOLLOWUPS = {
-    "yes", "no", "sure", "ok", "okay", "yeah", "yep", "nope",
-    "tell me more", "more", "expand", "elaborate", "explain",
-    "go on", "continue", "what else", "and", "also", "thanks",
-    "thank you", "got it", "understood", "show me", "details",
-    "how", "why", "when", "what", "which", "who",
-}
-
-
-def is_restaurant_query(message: str, history: list | None = None) -> bool:
-    """Classify whether the message is related to restaurant operations.
-    
-    If there is existing conversation history, follow-up messages are treated
-    as contextually valid (part of an ongoing restaurant operations discussion).
-    """
+def is_hard_blocked(message: str) -> bool:
+    """Check if a message is obviously off-topic (used only in fallback/no-LLM mode)."""
     text = message.lower().strip()
-
-    # If there's an ongoing conversation, allow short follow-up replies
-    # (e.g., "yes", "tell me more", "sure") without requiring keyword match
-    if history and len(history) > 0:
-        # Check if message is a short contextual follow-up
-        if len(text.split()) <= 6:
-            for phrase in CONTEXTUAL_FOLLOWUPS:
-                if text == phrase or text.startswith(phrase + " ") or text.endswith(" " + phrase):
-                    return True
-        # Also pass through if the history itself is a restaurant conversation
-        # (message is a continuation regardless of keyword presence)
-        return True
-
-    # Direct keyword match check
-    for word in RESTAURANT_KEYWORDS:
-        if word in text:
-            return True
-
-    # Common conversational greetings or status inquiries
-    general_greetings = ["hi", "hello", "hey", "help", "what can you do", "status", "report", "how are we doing", "metrics"]
-    if any(g in text for g in general_greetings):
-        return True
-
-    return False
+    return any(phrase in text for phrase in HARD_BLOCKLIST)
 
 
 async def build_restaurant_live_context(db: AsyncSession) -> dict[str, Any]:
@@ -284,13 +249,17 @@ async def process_ai_chat(
 ) -> AIChatResponse:
     """Process manager query, classify intent, pull context, call NIM API or fallback."""
     session_id = session_id or str(uuid.uuid4())
-    
-    # 1. Guardrail: Check domain restriction (context-aware — skips check if history exists)
-    if not is_restaurant_query(message, history):
+
+    # 1. Check for NVIDIA NIM API Key early — determines guardrail strategy.
+    # When NIM is active: no pre-filtering at all; the system prompt enforces domain.
+    # When NIM is absent (fallback): apply a hard blocklist for obviously off-topic messages.
+    nim_api_key = os.getenv("NVIDIA_NIM_API_KEY") or os.getenv("NVIDIA_API_KEY")
+
+    if not nim_api_key and is_hard_blocked(message):
         return AIChatResponse(
             reply=(
-                "I am designed strictly to assist with ResMan OS restaurant operations and analytics. "
-                "Please ask a question related to sales, revenue, inventory, active orders, kitchen status, table occupancy, or staff management."
+                "I am designed to assist with ResMan OS restaurant operations. "
+                "Please ask me about sales, revenue, inventory, active orders, kitchen status, table occupancy, or staff management."
             ),
             session_id=session_id,
             suggested_questions=[
@@ -304,9 +273,6 @@ async def process_ai_chat(
 
     # 2. Gather live context from database
     context = await build_restaurant_live_context(db)
-
-    # 3. Check for NVIDIA NIM API Key
-    nim_api_key = os.getenv("NVIDIA_NIM_API_KEY") or os.getenv("NVIDIA_API_KEY")
 
     reply_text = None
     engine_used = "live_db_fallback"
