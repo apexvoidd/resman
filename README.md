@@ -26,7 +26,28 @@ ResMan OS is a full-stack restaurant management system built for modern dine-in 
 
 ---
 
-## Complete End-to-End Workflow Lifecycle
+## Testing Guide & End-to-End Workflow
+
+### Recommended Setup (Single Device or Multi-Device)
+
+You can test the entire real-time restaurant lifecycle on **a single device using side-by-side browser tabs** or **two separate devices** (e.g. smartphone for customer + laptop for staff).
+
+> **Important Pro-Tip for Testers**:
+> - **Public Guest Access**: Customer check-in (`/join`), digital menu (`/join/menu`), payment pages (`/billing/[billId]`), and dish reviews (`/reviews/submit`) do **not** require login.
+> - **Staff Role Access**: Staff dashboards (`/waiter/dashboard`, `/kitchen/dashboard`, `/cleaning/dashboard`, `/cashier`, `/manager/dashboard`) require signing in via `/sign-in`.
+> - **Shortcut**: To test all staff dashboards simultaneously without switching accounts, **sign in with an Admin or Manager account**. Admin and Manager roles have master access across all staff screens (Waiter, Kitchen KDS, Cashier POS, Cleaning Queue, Inventory, and Executive Hub).
+
+#### Tab Setup Recommendation for Testing (Side-by-Side):
+- **Tab 1 (Customer Portal)**: `https://resman-aqqx.vercel.app/join` (Public - No login required)
+- **Tab 2 (Waiter Dashboard)**: `https://resman-aqqx.vercel.app/waiter/dashboard` (Requires Staff Login)
+- **Tab 3 (Kitchen Display / KDS)**: `https://resman-aqqx.vercel.app/kitchen/dashboard` (Requires Staff Login)
+- **Tab 4 (Cashier POS)**: `https://resman-aqqx.vercel.app/cashier` (Requires Staff Login)
+- **Tab 5 (Cleaning Dashboard)**: `https://resman-aqqx.vercel.app/cleaning/dashboard` (Requires Staff Login)
+- **Tab 6 (Manager Hub)**: `https://resman-aqqx.vercel.app/manager/dashboard` (Requires Staff Login)
+
+---
+
+### End-to-End Workflow Diagram
 
 ```mermaid
 flowchart TD
@@ -41,18 +62,60 @@ flowchart TD
     S9 --> S10["10. Verified Customer Dish Review (/reviews/submit)"]
 ```
 
-### Workflow Steps
+---
 
-1. **Entrance QR Scan & Customer Check-In (`/join`)**: Guest scans QR, enters party size, and receives auto table allocation or waitlist placement.
-2. **Waiter Dashboard Arrival Verification (`/waiter/dashboard`)**: Staff verifies arrival at the assigned table.
-3. **Digital Menu & Ordering (`/join/menu`)**: Customer browses menu, adds dish notes, and submits orders.
-4. **Kitchen KDS & Stock Deduction (`/kitchen/dashboard`)**: Orders stream to Kanban KDS. Accepting orders automatically deducts raw ingredient stock via configured recipes.
-5. **Real-Time Sound & Status Alert**: Status updates (`Preparing`, `Ready`, `Served`) trigger browser audio chimes and toast alerts on the customer screen.
-6. **Waiter Serving & Multi-Round Orders**: Waiter marks dishes served; customers can add extra items to their active dining session.
-7. **Consolidated Bill Request (`/join/menu`)**: Customer requests the bill once dining is complete.
-8. **Bill Settlement & Payments (`/billing/[billId]` or `/cashier`)**: Customer pays online via Razorpay (supporting split calculations) or via Cashier POS cash settlement.
-9. **Cleaning Queue & Auto-Assignment (`/cleaning/dashboard`)**: Cleaning staff marks table cleaned, automatically re-assigning it to the next waitlisted group.
-10. **Verified Customer Dish Review (`/reviews/submit`)**: Verified customers leave star ratings per dish; managers review analytics on Executive Dashboard.
+### Detailed 10-Step Testing Walkthrough
+
+#### Step 1: Customer Check-In (`/join`)
+1. Open `/join` on Tab 1 (Customer screen).
+2. Select party size (e.g. `2 Guests`), enter Guest Name (e.g. `John`), and click **Find Table**.
+3. ResMan OS automatically assigns an available dining table matching the group size (or places the customer in the Waitlist Queue if all matching tables are full).
+4. Click **Proceed to Menu** to view the assigned table status.
+
+#### Step 2: Waiter Dashboard Arrival Verification (`/waiter/dashboard`)
+1. Switch to Tab 2 (Waiter Dashboard).
+2. The newly assigned guest and table will appear under **Pending Arrival Verifications**.
+3. Click **Confirm Arrival** to verify the guest is seated.
+
+#### Step 3: Digital Menu Browsing & Order Placement (`/join/menu`)
+1. Return to Tab 1 (Customer screen). Notice the digital menu is now unlocked.
+2. Filter dishes by categories (Mains, Drinks, Veg) or search for specific items.
+3. Add items to cart, enter special instructions (e.g. *"Extra spicy"*), and click **Place Order**.
+4. The customer screen displays the active order status.
+
+#### Step 4: Kitchen KDS Execution & Recipe Stock Deduction (`/kitchen/dashboard`)
+1. Switch to Tab 3 (Kitchen Display System).
+2. The incoming order card appears live on the KDS Kanban board under the **Pending** column.
+3. Move the card to **Preparing** or click **Accept**.
+   - *Automated Backend Action*: Upon acceptance, raw ingredient quantities defined in the dish's recipe configuration are automatically deducted from the inventory stock.
+4. Move the order card to **Ready** when preparation is complete.
+
+#### Step 5: Real-Time Audio Chime & Status Alert (Customer Screen)
+1. Switch back to Tab 1 (Customer screen).
+2. An audio chime plays and a status notification toast pops up (*"Order is READY! Waiter will bring your food shortly."*).
+
+#### Step 6: Waiter Serving & Multi-Round Orders
+1. On Tab 2 (Waiter Dashboard), the waiter marks the order status as **Served**.
+2. Customers can place additional order rounds during the same dining session at any time.
+
+#### Step 7: Requesting the Bill (`/join/menu`)
+1. On Tab 1 (Customer screen), click **Request Bill**.
+2. An instant notification chime alerts both the Waiter and Cashier dashboards.
+
+#### Step 8: Bill Settlement & Payment (`/billing/[billId]` or `/cashier`)
+1. On Tab 1, click **Pay Bill** to navigate to the billing page (`/billing/[billId]`).
+2. Choose a settlement method:
+   - **Razorpay Online Payment**: Pay via UPI/Card/Net Banking (test mode). Includes per-person split calculator.
+   - **Cashier POS Settlement**: Switch to Tab 4 (`/cashier`), select the table's bill, enter cash tendered, calculate change, and settle the bill.
+
+#### Step 9: Cleaning Queue & Auto-Waitlist Assignment (`/cleaning/dashboard`)
+1. Once paid, the table state transitions to **Needs Cleaning**.
+2. Switch to Tab 5 (`/cleaning/dashboard`). Click **Mark Cleaned**.
+3. *Automated Backend Action*: The table becomes **Available**. If customers are waiting in the queue, ResMan OS automatically assigns the freshly cleaned table to the next waitlisted group.
+
+#### Step 10: Verified Dish Review & Executive Analytics (`/reviews/submit` & `/manager/dashboard`)
+1. On Tab 1, post-payment redirects the customer to submit 1-5 star ratings per ordered dish.
+2. Switch to Tab 6 (`/manager/dashboard`) to view updated real-time sales KPIs, average rating CSAT metrics, recipe profit margins, and AI Assistant query capabilities.
 
 ---
 
