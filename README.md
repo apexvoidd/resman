@@ -2,7 +2,7 @@
 
 > **Vibeathon 6.0** · Team **ApexVoid** · Solo Participant: **Ayush Kumar**
 
-ResMan OS is a full-stack restaurant management system built for modern dine-in operations for **Vibeathon 6.0**. It digitizes the entire restaurant workflow—starting when a customer scans the **Entrance QR Code** to check in at `/join`, get assigned a table or join the waitlist, browse the digital menu, and place orders, through to kitchen display execution, automated recipe inventory deduction, cashier POS settlement, Razorpay payments, live notification chimes, and post-meal customer reviews.
+ResMan OS is a full-stack restaurant management system built for modern dine-in operations for **Vibeathon 6.0**. It digitizes the entire restaurant workflow—starting when a customer scans the **Entrance QR Code** to land directly on `/join`, get assigned a table or join the waitlist, browse the digital menu, and place orders, through to kitchen display execution, automated recipe inventory deduction, cashier POS settlement, Razorpay payments, live notification chimes, and post-meal customer reviews.
 
 ---
 
@@ -38,7 +38,7 @@ You can test the entire real-time restaurant lifecycle on **a single device usin
 > - **Recommended Testing Mode**: To test all staff dashboards simultaneously without switching accounts, **sign in with an Admin or Manager account**. Admin and Manager roles have master access across all staff screens (Waiter, Kitchen KDS, Cashier POS, Cleaning Queue, Inventory, and Executive Hub).
 
 #### Tab Setup Recommendation for Testing (Side-by-Side):
-- **Tab 1 (Customer Portal)**: `https://resman-aqqx.vercel.app/join` (Public - No login required)
+- **Tab 1 (Customer Portal)**: `https://resman-aqqx.vercel.app/join` (Public - Customer Entrance QR Landing)
 - **Tab 2 (Waiter Dashboard)**: `https://resman-aqqx.vercel.app/waiter/dashboard` (Requires Staff Login)
 - **Tab 3 (Kitchen Display / KDS)**: `https://resman-aqqx.vercel.app/kitchen/dashboard` (Requires Staff Login)
 - **Tab 4 (Cashier POS)**: `https://resman-aqqx.vercel.app/cashier` (Requires Staff Login)
@@ -51,10 +51,10 @@ You can test the entire real-time restaurant lifecycle on **a single device usin
 
 ```mermaid
 flowchart TD
-    S1["1. Customer QR Check-in (/join)"] --> S2["2. Waiter Verifies Arrival (/waiter)"]
+    S1["1. Customer Scans Entrance QR (/join)"] --> S2["2. Waiter Verifies Arrival (/waiter)"]
     S2 --> S3["3. Browse & Place Order (/join/menu)"]
     S3 --> S4["4. Kitchen KDS Prepares & Deducts Stock (/kitchen)"]
-    S4 --> S5["5. Waiter Takes Food & Marks Served (/waiter)"]
+    S4 --> S5["5. Waiter Takes Food & Kitchen/Waiter Marks Served"]
     S5 --> S6["6. Customer Requests Bill (/join/menu)"]
     S6 --> S7["7. Payment: Razorpay Online or Cashier Cash (/billing)"]
     S7 --> S8["8. Cleaning Queue & Auto-Next Waitlist Assignment"]
@@ -65,11 +65,11 @@ flowchart TD
 
 ### Detailed Step-by-Step Testing Walkthrough
 
-#### Step 1: Customer Check-In (`/join`)
-1. Open `/join` on Tab 1 (Customer screen).
+#### Step 1: Customer Scans Entrance QR & Check-In (`/join`)
+1. Scan the Entrance QR code (or open `/join` on Tab 1 / mobile phone). This lands the customer directly on the Entrance Check-In page.
 2. Select party size (e.g. `2 Guests`), enter Guest Name (e.g. `John`), and click **Find Table**.
 3. ResMan OS automatically assigns an available dining table matching the group size (or places the customer in the Waitlist Queue if all matching tables are full).
-4. Click **I'm at my Table** to notify the floor staff.
+4. Click **I'm at my Table** to notify floor staff of arrival.
 
 #### Step 2: Waiter Dashboard Arrival Verification (`/waiter/dashboard`)
 1. Switch to Tab 2 (Waiter Dashboard).
@@ -90,9 +90,10 @@ flowchart TD
 4. Move the order card to **Ready** when food preparation is complete.
 5. On Tab 1 (Customer screen), a real-time audio chime plays and a status toast pops up (*"Order is READY! Waiter will bring your food shortly."*).
 
-#### Step 5: Waiter Takes Food from Kitchen & Marks Served (`/waiter/dashboard`)
-1. On Tab 2 (Waiter Dashboard), the waiter picks up the prepared dishes from the kitchen pass and clicks **Served** for the table's active order.
-2. Customers can place additional order rounds during the same dining session at any time.
+#### Step 5: Food Hand-Off & Marking Served
+1. When the food is ready, the waiter picks up the prepared dishes from the kitchen pass.
+2. Kitchen or Waiter staff marks the order as **Served**.
+3. Customers can place additional order rounds during the same dining session at any time.
 
 #### Step 6: Requesting the Bill (`/join/menu`)
 1. On Tab 1 (Customer screen), once dining is finished, click **Request Bill**.
