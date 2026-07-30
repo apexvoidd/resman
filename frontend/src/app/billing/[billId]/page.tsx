@@ -111,7 +111,7 @@ export default function BillingPage() {
       setErrorMsg(null);
       setSuccessMsg(null);
 
-      const targetAmount = splitCount > 1 ? perPersonShare : bill.grand_total;
+      const targetAmount = bill.grand_total;
 
       // 1. Create Razorpay order on backend
       const rzpOrder = await createRazorpayOrder(bill.id, targetAmount);
@@ -224,7 +224,7 @@ export default function BillingPage() {
       setErrorMsg(null);
       setSuccessMsg(null);
 
-      const targetAmount = splitCount > 1 ? perPersonShare : bill.grand_total;
+      const targetAmount = bill.grand_total;
 
       if (authToken) {
         // Staff logged in — confirm cash payment directly
@@ -546,7 +546,7 @@ export default function BillingPage() {
                   >
                     {isProcessingPayment
                       ? "Verifying Razorpay Signature..."
-                      : `Pay ₹${(splitCount > 1 ? perPersonShare : bill.grand_total).toFixed(2)} via Razorpay`}
+                      : `Pay ₹${bill.grand_total.toFixed(2)} via Razorpay`}
                   </button>
                 ) : (
                   <button
@@ -557,8 +557,8 @@ export default function BillingPage() {
                     {isProcessingPayment
                       ? (authToken ? "Recording Cash Payment..." : "Sending Cash Request...")
                       : (authToken
-                          ? `Confirm Cash Payment ₹${(splitCount > 1 ? perPersonShare : bill.grand_total).toFixed(2)}`
-                          : `🙋 Request Cash Settlement (₹${(splitCount > 1 ? perPersonShare : bill.grand_total).toFixed(2)})`)}
+                          ? `Confirm Cash Payment ₹${bill.grand_total.toFixed(2)}`
+                          : `🙋 Request Cash Settlement (₹${bill.grand_total.toFixed(2)})`)}
                   </button>
                 )}
               </div>
