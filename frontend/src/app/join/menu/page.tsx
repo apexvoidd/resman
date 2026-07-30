@@ -19,6 +19,47 @@ export default function CustomerSeatedMenuPage() {
   const [billMsg, setBillMsg] = useState<string | null>(null);
   const [activeBill, setActiveBill] = useState<BillData | null>(null);
   const prevOrdersRef = useRef<Record<string, string>>({});
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Auto-unlock AudioContext on first user interaction
+  useEffect(() => {
+    const unlock = () => {
+      if (!audioCtxRef.current) {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        audioCtxRef.current = new AudioCtx();
+      }
+      if (audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume();
+      }
+    };
+    document.addEventListener("click", unlock, { once: true });
+    document.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  const playNotificationChime = () => {
+    try {
+      const ctx = audioCtxRef.current;
+      if (!ctx || ctx.state === "suspended") return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      // Crisp customer friendly double-beep chime
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    } catch {
+      // fail silently
+    }
+  };
 
   const checkBill = async (st: string) => {
     try {
@@ -146,6 +187,7 @@ export default function CustomerSeatedMenuPage() {
       data.forEach((ord) => {
         const prevStatus = prevOrdersRef.current[ord.id];
         if (prevStatus && prevStatus !== ord.status) {
+          playNotificationChime();
           if (ord.status === "ready") {
             toast.success(`🍽️ Order #${ord.order_number} is READY! Waiter will bring your food shortly.`, "Kitchen Update", 7000);
           } else if (ord.status === "preparing") {
