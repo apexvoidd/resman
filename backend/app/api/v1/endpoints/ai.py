@@ -5,6 +5,7 @@ AI Manager Assistant API Endpoints.
 from typing import Any
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_role
@@ -32,6 +33,32 @@ async def chat_with_ai_assistant(
         message=payload.message,
         session_id=payload.session_id,
         history=payload.history,
+    )
+
+
+@router.post(
+    "/chat/stream",
+    status_code=status.HTTP_200_OK,
+)
+async def stream_chat_with_ai_assistant(
+    payload: AIChatRequest,
+    _: User = Depends(require_role(["manager", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """Stream manager query response as Server-Sent Events (SSE)."""
+    return StreamingResponse(
+        ai_service.process_ai_chat_stream(
+            db=db,
+            message=payload.message,
+            session_id=payload.session_id,
+            history=payload.history,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
     )
 
 

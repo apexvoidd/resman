@@ -5,10 +5,11 @@ Handles intent classification, live restaurant context gathering,
 NVIDIA NIM API integration, domain guardrails, and intelligent query synthesis.
 """
 
+import json
 import logging
 import os
 import uuid
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import httpx
 from sqlalchemy import func, select
@@ -351,3 +352,90 @@ async def process_ai_chat(
             "occupancy_rate": context["overview"].get("occupancy_rate"),
         },
     )
+
+async def process_ai_chat_stream(
+    db: AsyncSession,
+    message: str,
+    session_id: str | None = None,
+    history: list[AIChatMessage] | None = None,
+) -> AsyncGenerator[str, None]:
+    """Stream AI response as Server-Sent Events (SSE) chunks.
+
+    Yields 'data: {...}\\n\\n' lines compatible with the EventSource / fetch ReadableStream API.
+    Each chunk payload has a 'type' field: 'chunk' (partial text) or 'done' (end of stream).
+    """
+    session_id = session_id or str(uuid.uuid4())
+    nim_api_key = os.getenv("NVIDIA_NIM_API_KEY") or os.getenv("NVIDIA_API_KEY")
+
+    # Hard blocklist check (fallback mode only — NIM system prompt handles this when active)
+    if not nim_api_key and is_hard_blocked(message):
+        reply = (
+            "I am designed to assist with ResMan OS restaurant operations. "
+            "Please ask me about sales, revenue, inventory, active orders, kitchen status, "
+            "table occupancy, or staff management."
+        )
+        yield f"data: {json.dumps({'type': 'chunk', 'content': reply, 'session_id': session_id})}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'engine': 'live_db_fallback'})}\n\n"
+        return
+
+    # Gather live DB context
+    context = await build_restaurant_live_context(db)
+
+    if nim_api_key:
+        try:
+            logger.info(f"🚀 [STREAM] Calling NVIDIA NIM API (Model: {NVIDIA_NIM_MODEL})...")
+            system_prompt = build_system_prompt(context)
+            messages_payload: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+
+            if history:
+                for h in history[-10:]:
+                    if h.role in ["user", "assistant"] and h.content:
+                        messages_payload.append({"role": h.role, "content": h.content})
+
+            messages_payload.append({"role": "user", "content": message})
+
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"{NVIDIA_NIM_BASE_URL}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {nim_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": NVIDIA_NIM_MODEL,
+                        "messages": messages_payload,
+                        "temperature": 0.2,
+                        "max_tokens": 1024,
+                        "stream": True,
+                    },
+                ) as response:
+                    if response.status_code == 200:
+                        async for line in response.aiter_lines():
+                            if not line.startswith("data: "):
+                                continue
+                            raw = line[6:].strip()
+                            if raw == "[DONE]":
+                                break
+                            try:
+                                chunk_data = json.loads(raw)
+                                delta = chunk_data.get("choices", [{}])[0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    yield f"data: {json.dumps({'type': 'chunk', 'content': content, 'session_id': session_id})}\n\n"
+                            except Exception:
+                                pass
+
+                        logger.info("✅ [STREAM] NIM stream completed successfully")
+                        yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'engine': 'nvidia_nim'})}\n\n"
+                        return
+                    else:
+                        logger.warning(f"⚠️ [STREAM] NIM returned status {response.status_code}")
+        except Exception as e:
+            logger.error(f"❌ [STREAM] NIM streaming failed [{type(e).__name__}]: {e}")
+
+    # Fallback: yield complete synthesised text as a single chunk
+    logger.info("⚡ [STREAM] Falling back to Live Context Engine")
+    reply = generate_fallback_synthesis(message, context)
+    yield f"data: {json.dumps({'type': 'chunk', 'content': reply, 'session_id': session_id})}\n\n"
+    yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'engine': 'live_db_fallback'})}\n\n"

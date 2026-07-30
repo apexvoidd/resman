@@ -42,6 +42,8 @@ function KitchenDashboardPage() {
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
   const [prepMinutes, setPrepMinutes] = useState<number>(15);
   const [updatingTimeOrderId, setUpdatingTimeOrderId] = useState<string | null>(null);
+  const [pausingOrderId, setPausingOrderId] = useState<string | null>(null);
+  const [pauseReason, setPauseReason] = useState<string>("");
 
   const isAuthorized =
     hasRole("kitchen", "kitchen_staff", "chef", "manager", "admin");
@@ -200,15 +202,22 @@ function KitchenDashboardPage() {
     }
   };
 
-  const handlePause = async (orderId: string) => {
-    const reason = prompt("Enter reason for pausing preparation (optional):");
+  const handlePause = (orderId: string) => {
+    setPausingOrderId(orderId);
+    setPauseReason("");
+  };
+
+  const handlePauseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pausingOrderId) return;
     try {
-      setActionLoading(orderId);
+      setActionLoading(pausingOrderId);
       const token = await getToken();
       if (!token) return;
-
-      await pauseOrder(token, orderId, reason || undefined);
+      await pauseOrder(token, pausingOrderId, pauseReason.trim() || undefined);
       toast.warning("Order preparation PAUSED.", "Order Paused");
+      setPausingOrderId(null);
+      setPauseReason("");
       await loadKDSData();
     } catch (err: unknown) {
       const e = err as Error;
@@ -412,12 +421,13 @@ function KitchenDashboardPage() {
 
         {/* KDS Main View: Kanban Board vs Grid View */}
         {layoutMode === "kanban" ? (
-          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0 items-start">
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-5 lg:overflow-visible lg:pb-0 items-start">
             {[
               { id: "pending", title: "Pending", icon: "🟧", color: "border-amber-500/40 bg-amber-500/10 text-amber-400" },
               { id: "accepted", title: "Accepted", icon: "🟦", color: "border-blue-500/40 bg-blue-500/10 text-blue-400" },
               { id: "preparing", title: "Preparing", icon: "👨‍🍳", color: "border-indigo-500/40 bg-indigo-500/10 text-indigo-400" },
               { id: "ready", title: "Ready to Serve", icon: "🔔", color: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" },
+              { id: "paused", title: "Paused", icon: "⏸️", color: "border-yellow-500/40 bg-yellow-500/10 text-yellow-400" },
             ].map((col) => {
               const colOrders = orders.filter((o) => o.status === col.id);
 
@@ -584,6 +594,17 @@ function KitchenDashboardPage() {
                                   className="w-full rounded-lg bg-purple-600 py-2 text-xs font-bold text-white hover:bg-purple-500 transition"
                                 >
                                   ✓ Mark Served
+                                </button>
+                              )}
+
+                              {ord.status === "paused" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleResume(ord.id)}
+                                  disabled={isActionDisabled}
+                                  className="w-full rounded-lg bg-amber-500 py-2 text-xs font-bold text-gray-950 hover:bg-amber-400 transition"
+                                >
+                                  ▶️ Resume
                                 </button>
                               )}
                             </div>
@@ -886,6 +907,49 @@ function KitchenDashboardPage() {
                 className="rounded-xl bg-amber-500 px-5 py-2 text-xs font-bold text-gray-950 hover:bg-amber-400"
               >
                 Save Prep Time
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* PAUSE ORDER MODAL */}
+      {pausingOrderId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <form
+            onSubmit={handlePauseSubmit}
+            className="w-full max-w-sm rounded-2xl border border-gray-800 bg-gray-900 p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500/20 text-xl">⏸️</span>
+              <div>
+                <h3 className="text-base font-bold text-white">Pause Preparation</h3>
+                <p className="text-xs text-gray-400">Optionally enter a reason for pausing.</p>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-300">Reason (optional)</label>
+              <input
+                type="text"
+                value={pauseReason}
+                onChange={(e) => setPauseReason(e.target.value)}
+                placeholder="e.g. Waiting for ingredient, Station busy..."
+                className="mt-1.5 w-full rounded-xl bg-gray-950 px-4 py-3 text-sm text-white placeholder-gray-500 ring-1 ring-white/10 focus:ring-2 focus:ring-yellow-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setPausingOrderId(null)}
+                className="rounded-xl bg-gray-800 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="rounded-xl bg-yellow-500 px-5 py-2 text-xs font-bold text-gray-950 hover:bg-yellow-400"
+              >
+                ⏸️ Pause Order
               </button>
             </div>
           </form>

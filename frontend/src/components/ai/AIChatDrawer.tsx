@@ -1,7 +1,7 @@
 "use client";
 
 import { useRBAC } from "@/hooks/use-rbac";
-import { fetchAISuggestions, sendAIChatMessage, AIChatMessage } from "@/services/ai";
+import { fetchAISuggestions, streamAIChatMessage, AIChatMessage } from "@/services/ai";
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -95,35 +95,57 @@ export function AIChatDrawer() {
     if (!text || isLoading) return;
 
     const userMsg: AIChatMessage = { role: "user", content: text };
+    // Capture history snapshot BEFORE adding the new user message
+    const historySnapshot = [...messages];
     setMessages((prev) => [...prev, userMsg]);
     setInputMessage("");
     setIsLoading(true);
 
+    // Add an empty assistant bubble immediately — will be filled by stream chunks
+    const placeholderMsg: AIChatMessage = { role: "assistant", content: "" };
+    setMessages((prev) => [...prev, placeholderMsg]);
+
     try {
       const token = await getToken();
-      const response = await sendAIChatMessage(token, {
-        message: text,
-        session_id: sessionId,
-        history: messages,
-      });
 
-      setSessionId(response.session_id);
-      const assistantMsg: AIChatMessage = {
-        role: "assistant",
-        content: response.reply,
-        engine: response.engine_used,
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
-      if (response.suggested_questions && response.suggested_questions.length > 0) {
-        setSuggestions(response.suggested_questions);
-      }
+      await streamAIChatMessage(
+        token,
+        { message: text, session_id: sessionId, history: historySnapshot },
+        // onChunk: append each text delta to the last message
+        (chunk) => {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            updated[updated.length - 1] = { ...last, content: last.content + chunk };
+            return updated;
+          });
+        },
+        // onDone: set session ID, engine badge, and update suggestions
+        ({ session_id, engine }) => {
+          setSessionId(session_id);
+          setMessages((prev) => {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...updated[updated.length - 1], engine };
+            return updated;
+          });
+          setSuggestions([
+            "What are our top-selling items today?",
+            "Are any ingredients running low on stock?",
+            "Show kitchen order queue and prep status",
+            "What is our current table occupancy rate?",
+          ]);
+        },
+      );
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch response";
-      const errorMsg: AIChatMessage = {
-        role: "assistant",
-        content: `⚠️ **Error:** ${errorMessage}. Please try again.`,
-      };
-      setMessages((prev) => [...prev, errorMsg]);
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          role: "assistant",
+          content: `⚠️ **Error:** ${errorMessage}. Please try again.`,
+        };
+        return updated;
+      });
     } finally {
       setIsLoading(false);
     }
