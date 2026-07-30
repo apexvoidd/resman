@@ -151,42 +151,6 @@ flowchart TD
 
 ---
 
-## Key System Components
-
-1. **Customer QR Portal (`/join` & `/join/menu`)**
-   - Entrance QR check-in with automatic table allocation or waitlist assignment.
-   - Live category filtering, search, and dish customization.
-   - Real-time order progress tracking, audio chimes, and status toast notifications.
-   - Digital bill request and Razorpay online checkout or cash payment.
-   - Post-payment verified dish review submission.
-
-2. **Kitchen Display System (`/kitchen/dashboard`)**
-   - Drag-and-drop Kanban interface for order status transitions.
-   - Dedicated Paused column and custom pause reason modal.
-   - Auto-deduction of raw ingredient inventory based on dish recipe configurations.
-   - Priority tagging (Normal, High, Urgent) and prep time elapsed warnings.
-
-3. **Waiter POS (`/waiter/dashboard`)**
-   - Real-time table matrix showing occupancy and guest verification status.
-   - Audio chime notifications for incoming customer alerts and bill requests.
-   - One-click session bill generation.
-
-4. **Cashier POS (`/cashier`)**
-   - Settlement terminal for cash, card, and digital transactions.
-   - Cash change calculator and receipt printing.
-
-5. **Manager Executive Hub & AI Assistant (`/manager/dashboard`)**
-   - Executive KPIs: daily revenue, occupancy rate, low-stock counts, average rating.
-   - AI Manager Assistant powered by NVIDIA NIM for natural language database queries.
-   - Global restaurant status toggle (Open / Closed).
-   - Recipe profitability and gross margin analysis.
-
-6. **Inventory & Recipes (`/inventory` & `/recipes`)**
-   - Ingredient stock tracking, restock logs, and waste recording.
-   - Automated recipe costing and margin calculation per dish.
-
----
-
 ## Project Structure
 
 ```
@@ -265,31 +229,3 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxx
 CLERK_SECRET_KEY=sk_test_xxx
 ```
-
----
-
-## Changes Since Round 1
-
-### Features Added
-- **AI Manager Assistant Streaming**: Added a Server-Sent Events (SSE) streaming endpoint (`/api/v1/manager/ai/chat/stream`) and frontend integration in `AIChatDrawer.tsx` for real-time word-by-word AI response streaming.
-- **NVIDIA NIM & Database Context Integration**: Built context synthesis engine combining live sales, low stock, active orders, and table occupancy data into system prompts for Meta Llama 3.1 70B Instruct model with automatic fallback engine.
-- **KDS Kanban Board Enhancements**: Converted Kitchen Display System to a flex-scrolling Drag & Drop Kanban board with status columns (`Pending`, `Preparing`, `Ready`, `Completed`, and `Paused`).
-- **KDS Responsive Views**: Set default layout mode based on device screen size (Grid View on mobile screens, Kanban Board View on desktop screens).
-- **KDS Pause Workflow**: Replaced browser `prompt()` dialogs with a custom Pause Order modal for entering pause reasons.
-- **Audio Notification System**: Integrated Web Audio API chime notifications for Waiter POS alerts and customer order status updates (`Preparing`, `Ready`, `Served`), including single-gesture AudioContext initialization for browser autoplay compliance.
-- **Restaurant Status Control**: Added a global Open/Closed status toggle for managers in the navigation header to control order acceptance.
-- **Dynamic Billing Charges**: Added restaurant-configurable tax and service charge percentages applied during bill generation.
-- **Menu Ratings**: Added customer star rating aggregation to menu items displayed on guest menus.
-
-### Fixes & Improvements
-- **Persistent Header Layout**: Refactored `AppLayout.tsx` to fix the top navigation bar at the top of the viewport across mobile and desktop devices.
-- **PostgreSQL Migration Compatibility**: Updated startup DB initialization (`db/session.py`) to handle automatic column migrations (`is_closed` settings) on PostgreSQL instances.
-- **Billing Eager Loading**: Fixed SQLAlchemy `MissingGreenlet` async execution errors during bill generation by eagerly loading items and table relationships.
-- **Database Connection Pooling**: Enabled `pool_pre_ping` and `pool_recycle` on database engine creation to prevent stale database connection drops.
-- **NVIDIA NIM Timeout Handling**: Extended HTTP client timeout to 45 seconds for high-parameter model inference.
-- **Frontend Split Bill**: Replaced backend API split bill calculations with an inline frontend per-person calculator.
-
-### UI Cleanups
-- Removed obsolete "Register" button from the main navigation header bar.
-- Removed non-functional "Stock Audit History" tab from the Inventory Control page.
-- Restricted Waiter POS notifications container height with vertical scrolling to prevent page overflow.
