@@ -41,19 +41,46 @@ RESTAURANT_KEYWORDS = {
 }
 
 
-def is_restaurant_query(message: str) -> bool:
-    """Classify whether the message is related to restaurant operations."""
-    text = message.lower()
-    # Direct match check
+# Short contextual follow-ups that are valid within an ongoing conversation
+CONTEXTUAL_FOLLOWUPS = {
+    "yes", "no", "sure", "ok", "okay", "yeah", "yep", "nope",
+    "tell me more", "more", "expand", "elaborate", "explain",
+    "go on", "continue", "what else", "and", "also", "thanks",
+    "thank you", "got it", "understood", "show me", "details",
+    "how", "why", "when", "what", "which", "who",
+}
+
+
+def is_restaurant_query(message: str, history: list | None = None) -> bool:
+    """Classify whether the message is related to restaurant operations.
+    
+    If there is existing conversation history, follow-up messages are treated
+    as contextually valid (part of an ongoing restaurant operations discussion).
+    """
+    text = message.lower().strip()
+
+    # If there's an ongoing conversation, allow short follow-up replies
+    # (e.g., "yes", "tell me more", "sure") without requiring keyword match
+    if history and len(history) > 0:
+        # Check if message is a short contextual follow-up
+        if len(text.split()) <= 6:
+            for phrase in CONTEXTUAL_FOLLOWUPS:
+                if text == phrase or text.startswith(phrase + " ") or text.endswith(" " + phrase):
+                    return True
+        # Also pass through if the history itself is a restaurant conversation
+        # (message is a continuation regardless of keyword presence)
+        return True
+
+    # Direct keyword match check
     for word in RESTAURANT_KEYWORDS:
         if word in text:
             return True
-    
+
     # Common conversational greetings or status inquiries
     general_greetings = ["hi", "hello", "hey", "help", "what can you do", "status", "report", "how are we doing", "metrics"]
     if any(g in text for g in general_greetings):
         return True
-        
+
     return False
 
 
@@ -258,8 +285,8 @@ async def process_ai_chat(
     """Process manager query, classify intent, pull context, call NIM API or fallback."""
     session_id = session_id or str(uuid.uuid4())
     
-    # 1. Guardrail: Check domain restriction
-    if not is_restaurant_query(message):
+    # 1. Guardrail: Check domain restriction (context-aware — skips check if history exists)
+    if not is_restaurant_query(message, history):
         return AIChatResponse(
             reply=(
                 "I am designed strictly to assist with ResMan OS restaurant operations and analytics. "
@@ -286,6 +313,7 @@ async def process_ai_chat(
 
     logger.info("==================================================")
     logger.info(f"🤖 [AI MANAGER ASSISTANT] Received Query: '{message}'")
+    logger.info(f"🆔 Session ID: {session_id[:8]}... | History Depth: {len(history) if history else 0} turn(s)")
     logger.info(f"🔑 API Key Found: {'YES (NVIDIA NIM)' if nim_api_key else 'NO (Using Live DB Fallback)'}")
 
     if nim_api_key:
@@ -295,8 +323,10 @@ async def process_ai_chat(
             messages = [{"role": "system", "content": system_prompt}]
             
             if history:
-                for h in history[-4:]: # Include last 4 turns
-                    messages.append({"role": h.role, "content": h.content})
+                # Include up to 10 recent turns from the active session
+                for h in history[-10:]:
+                    if h.role in ["user", "assistant"] and h.content:
+                        messages.append({"role": h.role, "content": h.content})
                     
             messages.append({"role": "user", "content": message})
 
