@@ -5,13 +5,11 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   BillData,
-  calculateSplitBill,
   confirmCashPayment,
   createRazorpayOrder,
   getBill,
   getInvoiceHtmlUrl,
   requestCashSettlement,
-  SplitBillResult,
   unlockSession,
   verifyRazorpayPayment,
 } from "@/services/billing";
@@ -28,13 +26,8 @@ export default function BillingPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Split Bill state
-  const [splitType, setSplitType] = useState<"equal" | "item" | "custom">("equal");
+  // Split calculator state (frontend only)
   const [splitCount, setSplitCount] = useState<number>(2);
-  const [customAmount, setCustomAmount] = useState<number>(0);
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [splitResult, setSplitResult] = useState<SplitBillResult | null>(null);
-  const [isSplitting, setIsSplitting] = useState(false);
 
   // Payment Method selection
   const [paymentMethod, setPaymentMethod] = useState<"upi" | "card" | "netbanking" | "cash">("upi");
@@ -108,29 +101,8 @@ export default function BillingPage() {
     }
   };
 
-  const handleCalculateSplit = async () => {
-    if (!bill) return;
-    try {
-      setIsSplitting(true);
-      setErrorMsg(null);
-      const res = await calculateSplitBill({
-        bill_id: bill.id,
-        split_type: splitType,
-        split_count: splitCount,
-        custom_amount: customAmount,
-        order_item_ids: selectedItemIds,
-      });
-      setSplitResult(res);
-      toast.success(res.message || `Split share updated: ₹${res.share_amount.toFixed(2)}`, "Split Calculated");
-    } catch (err: unknown) {
-      const e = err as Error;
-      const msg = e.message || "Failed to calculate split.";
-      setErrorMsg(msg);
-      toast.error(msg, "Split Error");
-    } finally {
-      setIsSplitting(false);
-    }
-  };
+  // Per-person share — pure frontend calculation
+  const perPersonShare = bill ? bill.grand_total / Math.max(splitCount, 1) : 0;
 
   const handleRazorpayPayment = async () => {
     if (!bill) return;
@@ -139,7 +111,7 @@ export default function BillingPage() {
       setErrorMsg(null);
       setSuccessMsg(null);
 
-      const targetAmount = splitResult ? splitResult.share_amount : bill.grand_total;
+      const targetAmount = splitCount > 1 ? perPersonShare : bill.grand_total;
 
       // 1. Create Razorpay order on backend
       const rzpOrder = await createRazorpayOrder(bill.id, targetAmount);
@@ -252,7 +224,7 @@ export default function BillingPage() {
       setErrorMsg(null);
       setSuccessMsg(null);
 
-      const targetAmount = splitResult ? splitResult.share_amount : bill.grand_total;
+      const targetAmount = splitCount > 1 ? perPersonShare : bill.grand_total;
 
       if (authToken) {
         // Staff logged in — confirm cash payment directly
@@ -473,108 +445,36 @@ export default function BillingPage() {
 
           {/* Payment & Split Bill Panel */}
           <div className="lg:col-span-5 space-y-6">
-            {/* Split Bill Options */}
+            {/* Split Calculator */}
             {!isPaid && (
               <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-2xl space-y-4">
-                <h3 className="text-md font-bold text-white">Split Bill Options</h3>
-                <div className="grid grid-cols-3 gap-2 text-xs font-semibold">
-                  <button
-                    onClick={() => setSplitType("equal")}
-                    className={`py-2 rounded-lg border ${
-                      splitType === "equal"
-                        ? "bg-indigo-600 text-white border-indigo-500"
-                        : "bg-slate-800 text-slate-400 border-slate-700"
-                    }`}
-                  >
-                    Equal Split
-                  </button>
-                  <button
-                    onClick={() => setSplitType("item")}
-                    className={`py-2 rounded-lg border ${
-                      splitType === "item"
-                        ? "bg-indigo-600 text-white border-indigo-500"
-                        : "bg-slate-800 text-slate-400 border-slate-700"
-                    }`}
-                  >
-                    By Item
-                  </button>
-                  <button
-                    onClick={() => setSplitType("custom")}
-                    className={`py-2 rounded-lg border ${
-                      splitType === "custom"
-                        ? "bg-indigo-600 text-white border-indigo-500"
-                        : "bg-slate-800 text-slate-400 border-slate-700"
-                    }`}
-                  >
-                    Custom
-                  </button>
+                <h3 className="text-md font-bold text-white">Split Bill</h3>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-xs text-slate-400">Number of People</label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSplitCount((n) => Math.max(1, n - 1))}
+                      className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg leading-none"
+                    >
+                      −
+                    </button>
+                    <span className="w-8 text-center text-white font-semibold text-sm">{splitCount}</span>
+                    <button
+                      onClick={() => setSplitCount((n) => Math.min(20, n + 1))}
+                      className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg leading-none"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-
-                {splitType === "equal" && (
-                  <div className="flex items-center gap-3">
-                    <label className="text-xs text-slate-400">Guests:</label>
-                    <input
-                      type="number"
-                      min="2"
-                      max="20"
-                      value={splitCount}
-                      onChange={(e) => setSplitCount(parseInt(e.target.value) || 2)}
-                      className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-sm text-white"
-                    />
-                  </div>
-                )}
-
-                {splitType === "custom" && (
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1">Custom Amount (₹):</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={customAmount}
-                      onChange={(e) => setCustomAmount(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white"
-                    />
-                  </div>
-                )}
-
-                {splitType === "item" && (
-                  <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
-                    {bill.items.map((it) => (
-                      <label key={it.id} className="flex items-center justify-between text-xs text-slate-300">
-                        <span className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedItemIds.includes(it.order_item_id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedItemIds([...selectedItemIds, it.order_item_id]);
-                              } else {
-                                setSelectedItemIds(selectedItemIds.filter((id) => id !== it.order_item_id));
-                              }
-                            }}
-                          />
-                          {it.item_name}
-                        </span>
-                        <span>₹{it.total_price.toFixed(2)}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                <button
-                  onClick={handleCalculateSplit}
-                  disabled={isSplitting}
-                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl"
-                >
-                  {isSplitting ? "Calculating..." : "Apply Split Share"}
-                </button>
-
-                {splitResult && (
-                  <div className="bg-indigo-500/10 border border-indigo-500/30 p-3 rounded-xl text-xs space-y-1">
-                    <p className="text-indigo-300 font-bold">{splitResult.message}</p>
-                    <p className="text-slate-400">Share to pay now: <strong className="text-white">₹{splitResult.share_amount.toFixed(2)}</strong></p>
-                  </div>
-                )}
+                <div className="bg-indigo-500/10 border border-indigo-500/30 p-3 rounded-xl flex items-center justify-between">
+                  <span className="text-xs text-slate-400">
+                    {splitCount === 1 ? "Full bill" : `Each person pays`}
+                  </span>
+                  <span className="text-lg font-extrabold text-indigo-300">
+                    ₹{perPersonShare.toFixed(2)}
+                  </span>
+                </div>
               </div>
             )}
 
@@ -646,7 +546,7 @@ export default function BillingPage() {
                   >
                     {isProcessingPayment
                       ? "Verifying Razorpay Signature..."
-                      : `Pay ₹${(splitResult ? splitResult.share_amount : bill.grand_total).toFixed(2)} via Razorpay`}
+                      : `Pay ₹${(splitCount > 1 ? perPersonShare : bill.grand_total).toFixed(2)} via Razorpay`}
                   </button>
                 ) : (
                   <button
@@ -657,8 +557,8 @@ export default function BillingPage() {
                     {isProcessingPayment
                       ? (authToken ? "Recording Cash Payment..." : "Sending Cash Request...")
                       : (authToken
-                          ? `Confirm Cash Payment ₹${(splitResult ? splitResult.share_amount : bill.grand_total).toFixed(2)}`
-                          : `🙋 Request Cash Settlement (₹${(splitResult ? splitResult.share_amount : bill.grand_total).toFixed(2)})`)}
+                          ? `Confirm Cash Payment ₹${(splitCount > 1 ? perPersonShare : bill.grand_total).toFixed(2)}`
+                          : `🙋 Request Cash Settlement (₹${(splitCount > 1 ? perPersonShare : bill.grand_total).toFixed(2)})`)}
                   </button>
                 )}
               </div>

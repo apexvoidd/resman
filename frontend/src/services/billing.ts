@@ -1,7 +1,7 @@
 /**
  * Frontend Billing & Payments Service.
  * Interfaces with FastAPI endpoints for Bill Request, Generation, Razorpay Payments,
- * Cash settlements, Split Bill calculation, and Printable Tax Invoices.
+ * Cash settlements, and Printable Tax Invoices.
  */
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -39,22 +39,6 @@ export interface BillData {
   updated_at: string;
 }
 
-export interface SplitBillParams {
-  bill_id: string;
-  split_type: "equal" | "item" | "custom";
-  split_count?: number;
-  order_item_ids?: string[];
-  custom_amount?: number;
-}
-
-export interface SplitBillResult {
-  bill_id: string;
-  split_type: string;
-  share_amount: number;
-  remaining_amount: number;
-  total_bill_amount: number;
-  message: string;
-}
 
 export interface RazorpayOrderResult {
   razorpay_order_id: string;
@@ -187,21 +171,6 @@ export async function unlockSession(token: string, sessionId: string): Promise<{
   return res.json();
 }
 
-/**
- * Calculate Split Bill
- */
-export async function calculateSplitBill(params: SplitBillParams): Promise<SplitBillResult> {
-  const res = await fetch(`${API}/api/v1/billing/split-calculate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.detail ?? "Failed to calculate split bill.");
-  }
-  return res.json();
-}
 
 /**
  * Create Razorpay Order
