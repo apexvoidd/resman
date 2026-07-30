@@ -69,12 +69,10 @@ def _build_out(restaurant: Restaurant) -> RestaurantSettingsOut:
         # Settings fields — fall back to defaults when no settings row yet
         settings_id=s.id if s else None,
         gst_number=s.gst_number if s else None,
+        is_closed=bool(s.is_closed) if s else False,
         currency=s.currency if s else "INR",
-        timezone=s.timezone if s else "Asia/Kolkata",
-        tax_percentage=float(s.tax_percentage) if s else 0.0,
+        tax_percentage=float(s.tax_percentage) if s else 5.0,
         service_charge_percentage=float(s.service_charge_percentage) if s else 0.0,
-        reservation_timeout_minutes=s.reservation_timeout_minutes if s else 15,
-        queue_timeout_minutes=s.queue_timeout_minutes if s else 30,
         opening_time=s.opening_time if s else None,
         closing_time=s.closing_time if s else None,
     )
@@ -115,12 +113,9 @@ async def update_settings(
     s = restaurant.settings
     settings_fields = (
         "gst_number",
-        "currency",
-        "timezone",
+        "is_closed",
         "tax_percentage",
         "service_charge_percentage",
-        "reservation_timeout_minutes",
-        "queue_timeout_minutes",
         "opening_time",
         "closing_time",
     )

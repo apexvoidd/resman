@@ -5,7 +5,7 @@ Pydantic schemas for RestaurantSettings API.
 import re
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -41,12 +41,10 @@ class RestaurantSettingsOut(BaseModel):
     # From RestaurantSettings
     settings_id: uuid.UUID | None = None
     gst_number: str | None = None
+    is_closed: bool = False
     currency: str = "INR"
-    timezone: str = "Asia/Kolkata"
-    tax_percentage: float = 0.0
+    tax_percentage: float = 5.0
     service_charge_percentage: float = 0.0
-    reservation_timeout_minutes: int = 15
-    queue_timeout_minutes: int = 30
     opening_time: str | None = None
     closing_time: str | None = None
 
@@ -67,12 +65,9 @@ class RestaurantSettingsUpdate(BaseModel):
 
     # Settings-level fields
     gst_number: Annotated[str | None, Field(max_length=50)] = None
-    currency: Annotated[str | None, Field(min_length=3, max_length=10)] = None
-    timezone: Annotated[str | None, Field(min_length=1, max_length=100)] = None
+    is_closed: bool | None = None
     tax_percentage: Annotated[float | None, Field(ge=0, le=100)] = None
     service_charge_percentage: Annotated[float | None, Field(ge=0, le=100)] = None
-    reservation_timeout_minutes: Annotated[int | None, Field(ge=1, le=1440)] = None
-    queue_timeout_minutes: Annotated[int | None, Field(ge=1, le=1440)] = None
     opening_time: str | None = None
     closing_time: str | None = None
 
@@ -89,8 +84,20 @@ class RestaurantSettingsUpdate(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_email(cls, v: str | None) -> str | None:
-        if v is not None and "@" not in v:
-            raise ValueError("email must be a valid email address")
+        if v is not None:
+            v_stripped = v.strip()
+            if not v_stripped:
+                return None
+            if "@" not in v_stripped:
+                raise ValueError("email must be a valid email address")
+            return v_stripped
+        return None
+
+    @field_validator("name", "address", "phone", "gst_number", mode="before")
+    @classmethod
+    def normalize_empty_strings(cls, v: Any) -> Any:
+        if isinstance(v, str) and not v.strip():
+            return None
         return v
 
     @model_validator(mode="after")

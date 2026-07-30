@@ -29,6 +29,7 @@ class BillOut(BaseModel):
     table_number: str | None = None
     guest_name: str | None = None
     guest_email: str | None = None
+    gst_number: str | None = None
     subtotal: float
     tax_percentage: float = 0.0
     tax_amount: float = 0.0

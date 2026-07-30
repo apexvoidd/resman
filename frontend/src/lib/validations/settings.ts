@@ -12,8 +12,7 @@ export const settingsSchema = z
       .optional()
       .nullable(),
     gst_number: z.string().max(50).optional().nullable(),
-    currency: z.string().min(1, "Currency is required").max(10),
-    timezone: z.string().min(1, "Timezone is required").max(100),
+    is_closed: z.boolean().optional(),
     tax_percentage: z
       .number({ message: "Tax percentage must be a number" })
       .min(0, "Tax percentage cannot be negative")
@@ -22,14 +21,6 @@ export const settingsSchema = z
       .number({ message: "Service charge must be a number" })
       .min(0, "Service charge cannot be negative")
       .max(100, "Service charge cannot exceed 100"),
-    reservation_timeout_minutes: z
-      .number({ message: "Reservation timeout must be a number" })
-      .min(1, "Reservation timeout must be at least 1 minute")
-      .max(1440, "Timeout cannot exceed 24 hours (1440 min)"),
-    queue_timeout_minutes: z
-      .number({ message: "Queue timeout must be a number" })
-      .min(1, "Queue timeout must be at least 1 minute")
-      .max(1440, "Timeout cannot exceed 24 hours (1440 min)"),
     opening_time: z
       .string()
       .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Time must be in HH:MM format")

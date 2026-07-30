@@ -382,6 +382,7 @@ def _build_bill_out(
         table_number=table_num,
         guest_name=guest_name,
         guest_email=guest_email,
+        gst_number=settings_obj.gst_number if settings_obj else None,
         subtotal=subtotal,
         tax_percentage=tax_pct,
         tax_amount=tax_amt,
@@ -1114,6 +1115,7 @@ def generate_invoice_html(bill: BillOut) -> str:
           <div>
             <h1 style="margin: 0; font-size: 24px;">Smart Restaurant</h1>
             <p style="margin: 4px 0; color: #666; font-size: 12px;">Official Tax Invoice</p>
+            {f'<p style="margin: 2px 0; color: #444; font-size: 11px;">GSTIN: {bill.gst_number}</p>' if bill.gst_number else ''}
           </div>
           <div style="text-align: right;">
             <h3 style="margin: 0;">{bill.bill_number}</h3>

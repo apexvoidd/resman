@@ -13,12 +13,10 @@ export interface RestaurantSettings {
   email: string | null;
   settings_id: string | null;
   gst_number: string | null;
+  is_closed: boolean;
   currency: string;
-  timezone: string;
   tax_percentage: number;
   service_charge_percentage: number;
-  reservation_timeout_minutes: number;
-  queue_timeout_minutes: number;
   opening_time: string | null;
   closing_time: string | null;
   updated_at: string;

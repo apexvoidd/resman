@@ -1,10 +1,56 @@
 "use client";
 
 import { useRBAC } from "@/hooks/use-rbac";
-import { UserButton, useUser } from "@clerk/nextjs";
+import { useAuth, UserButton, useUser } from "@clerk/nextjs";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchSettings, updateSettings, RestaurantSettings } from "@/services/settings";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+
+function RestaurantStatusToggle() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: settings } = useQuery<RestaurantSettings>({
+    queryKey: ["restaurant-settings"],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("Unauthenticated");
+      return fetchSettings(token);
+    },
+    staleTime: 30000,
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async (closed: boolean) => {
+      const token = await getToken();
+      if (!token) throw new Error("Unauthenticated");
+      return updateSettings(token, { is_closed: closed });
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["restaurant-settings"], updated);
+    },
+  });
+
+  const isClosed = settings?.is_closed ?? false;
+
+  return (
+    <button
+      onClick={() => toggleMutation.mutate(!isClosed)}
+      disabled={toggleMutation.isPending}
+      title={isClosed ? "Click to OPEN restaurant for orders" : "Click to CLOSE restaurant"}
+      className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide uppercase transition border flex items-center gap-1.5 ${
+        isClosed
+          ? "bg-rose-500/20 text-rose-400 border-rose-500/40 hover:bg-rose-500/30"
+          : "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30"
+      }`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${isClosed ? "bg-rose-500" : "bg-emerald-400 animate-pulse"}`} />
+      <span>{isClosed ? "CLOSED" : "OPEN"}</span>
+    </button>
+  );
+}
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useUser();
@@ -290,6 +336,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center space-x-2.5">
+            {/* Restaurant Status Quick Indicator for Managers & Admins */}
+            {(hasRole("manager", "admin") || isSuperadmin) && (
+              <RestaurantStatusToggle />
+            )}
+
             <span className="hidden lg:inline text-[11px] font-semibold text-[#2563EB] bg-[#2563EB]/10 border border-[#2563EB]/20 px-2.5 py-1 rounded-md">
               {primaryRole} Mode
             </span>

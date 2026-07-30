@@ -9,6 +9,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    Boolean,
     ForeignKey,
     Integer,
     Numeric,
@@ -39,10 +40,9 @@ class RestaurantSettings(BaseModel):
         index=True,
     )
 
-    # ── Identity ──────────────────────────────────────────────────────────────
-    # (name / logo / address / phone / email are on the Restaurant row;
-    #  only settings-specific overrides live here)
+    # ── Identity & Status ──────────────────────────────────────────────────────
     gst_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    is_closed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # ── Locale ────────────────────────────────────────────────────────────────
     currency: Mapped[str] = mapped_column(String(10), default="INR", nullable=False)
@@ -52,7 +52,7 @@ class RestaurantSettings(BaseModel):
 
     # ── Financial ─────────────────────────────────────────────────────────────
     tax_percentage: Mapped[float] = mapped_column(
-        Numeric(5, 2), default=0.0, nullable=False
+        Numeric(5, 2), default=5.0, nullable=False
     )
     service_charge_percentage: Mapped[float] = mapped_column(
         Numeric(5, 2), default=0.0, nullable=False

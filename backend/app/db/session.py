@@ -157,6 +157,16 @@ async def init_db() -> None:
                             )
                         )
 
+                # Ensure restaurant_settings columns
+                if "restaurant_settings" in inspector.get_table_names():
+                    cols = {c["name"] for c in inspector.get_columns("restaurant_settings")}
+                    if "is_closed" not in cols:
+                        sync_conn.execute(
+                            text(
+                                "ALTER TABLE restaurant_settings ADD COLUMN is_closed BOOLEAN DEFAULT 0 NOT NULL;"
+                            )
+                        )
+
                 # Ensure reviews columns
                 if "reviews" in inspector.get_table_names():
                     cols = {c["name"] for c in inspector.get_columns("reviews")}

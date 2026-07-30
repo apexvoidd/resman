@@ -43,18 +43,18 @@ async def get_settings(
 @router.put(
     "",
     response_model=RestaurantSettingsOut,
-    summary="Update restaurant settings (Admin only)",
+    summary="Update restaurant settings (Admin and Manager)",
     status_code=status.HTTP_200_OK,
 )
 async def update_settings(
     payload: RestaurantSettingsUpdate,
-    _: User = Depends(require_role(["admin"])),
+    _: User = Depends(require_role(["admin", "manager"])),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
     Partially updates restaurant settings.
     Only fields included in the request body are modified.
-    Requires the **admin** role.
+    Requires the **admin** or **manager** role.
     """
     return await settings_service.update_settings(db, payload)
 

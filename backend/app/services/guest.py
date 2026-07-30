@@ -210,6 +210,15 @@ async def find_table_or_enqueue(
     """
     now = datetime.now(UTC)
 
+    from app.services.settings import get_first_restaurant
+
+    restaurant = await get_first_restaurant(db)
+    if restaurant.settings and restaurant.settings.is_closed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Restaurant is currently closed. Table booking and waiting list registration are temporarily disabled.",
+        )
+
     cd_until = _ensure_utc(session.cooldown_until)
     if cd_until and cd_until > now:
         remaining = int((cd_until - now).total_seconds())

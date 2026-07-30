@@ -132,6 +132,16 @@ async def create_customer_order(
     """
     now = datetime.now(UTC)
 
+    # 0. Check if restaurant is closed
+    from app.services.settings import get_first_restaurant
+
+    restaurant = await get_first_restaurant(db)
+    if restaurant.settings and restaurant.settings.is_closed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Restaurant is currently closed for ordering.",
+        )
+
     # 1. Prerequisite Checks: Session must be active, assigned to table, and verified
     if not session.is_active or not session.table_id:
         raise HTTPException(
@@ -268,7 +278,8 @@ async def create_customer_order(
                                 )
 
     # 4. Atomic Transaction Creation
-    tax_amt = round(subtotal * TAX_RATE, 2)
+    tax_pct = float(restaurant.settings.tax_percentage) if restaurant and restaurant.settings else 5.0
+    tax_amt = round(subtotal * (tax_pct / 100.0), 2)
     final_amt = round(subtotal + tax_amt, 2)
     order_num = f"ORD-{now.strftime('%Y%m%d')}-{secrets.token_hex(3).upper()}"
 
