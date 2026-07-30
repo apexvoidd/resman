@@ -26,16 +26,38 @@ ResMan OS is a full-stack restaurant management system built for modern dine-in 
 
 ---
 
+> [!TIP]
+> ### Featured Innovation: AI Manager Assistant (NVIDIA NIM Integration)
+> ResMan OS includes an interactive **AI Manager Assistant** built directly into the Executive Hub. Powered by the **NVIDIA NIM API** (Meta Llama 3.1 70B Instruct) with a real-time PostgreSQL database context engine:
+> - **Natural Language Operational Queries**: Ask about daily revenue, low-stock inventory, table occupancy rates, active kitchen orders, and dish profit margins.
+> - **Server-Sent Events (SSE) Streaming**: Responses stream in real-time word-by-word with a typewriter effect directly inside the floating assistant drawer.
+> - **Starter Suggestions**: Instant clickable prompt chips for fast executive briefings.
+> - **Live DB Context Synthesis**: Synthesizes live restaurant database metrics into LLM prompts with an automatic offline fallback engine.
+>
+> *(Note: The AI Assistant uses LLM inference on live DB snapshots. While built with domain guardrails, AI responses may occasionally make mistakes or hallucinate numbers—managers can verify raw metrics on core dashboard screens).*
+
+---
+
+> [!IMPORTANT]
+> ### Executive Oversight: Manager & Admin Master Control
+> The **Manager Executive Hub** (`/manager/dashboard`) acts as the command center for the entire restaurant.
+> - **Full System Visibility**: Monitor live sales revenue KPIs, table occupancy rates, kitchen prep queues, low-stock alerts, customer CSAT ratings, and recipe gross margins.
+> - **Master Role Access**: Admin and Manager roles have elevated permissions to access ALL staff screens (Waiter POS, Kitchen KDS, Cashier POS, Cleaning Queue, Inventory Control, and Review Management) seamlessly without switching accounts.
+> - **Store Control**: Toggle store Open/Closed status, adjust tax/service charge percentages, and issue urgent broadcast announcements to staff.
+
+---
+
 ## Testing Guide & End-to-End Workflow
 
 ### Recommended Setup (Single Device or Multi-Device)
 
 You can test the entire real-time restaurant lifecycle on **a single device using side-by-side browser tabs** or **two separate devices** (e.g. smartphone for customer + laptop for staff).
 
-> **Important Pro-Tip for Testers**:
+> [!NOTE]
+> **Pro-Tip for Testers**:
 > - **Public Guest Access**: Customer check-in (`/join`), digital menu (`/join/menu`), payment pages (`/billing/[billId]`), and dish reviews (`/reviews/submit`) do **not** require login.
 > - **Staff Role Access**: Staff dashboards (`/waiter/dashboard`, `/kitchen/dashboard`, `/cleaning/dashboard`, `/cashier`, `/manager/dashboard`) require signing in via `/sign-in`.
-> - **Recommended Testing Mode**: To test all staff dashboards simultaneously without switching accounts, **sign in with an Admin or Manager account**. Admin and Manager roles have master access across all staff screens (Waiter, Kitchen KDS, Cashier POS, Cleaning Queue, Inventory, and Executive Hub).
+> - **Recommended Testing Mode**: **Sign in with an Admin or Manager account**. Admin and Manager accounts have master access across all staff screens, enabling side-by-side tab testing without logging in and out.
 
 #### Tab Setup Recommendation for Testing (Side-by-Side):
 - **Tab 1 (Customer Portal)**: `https://resman-aqqx.vercel.app/join` (Public - Customer Entrance QR Landing)
@@ -43,7 +65,7 @@ You can test the entire real-time restaurant lifecycle on **a single device usin
 - **Tab 3 (Kitchen Display / KDS)**: `https://resman-aqqx.vercel.app/kitchen/dashboard` (Requires Staff Login)
 - **Tab 4 (Cashier POS)**: `https://resman-aqqx.vercel.app/cashier` (Requires Staff Login)
 - **Tab 5 (Cleaning Dashboard)**: `https://resman-aqqx.vercel.app/cleaning/dashboard` (Requires Staff Login)
-- **Tab 6 (Manager Hub)**: `https://resman-aqqx.vercel.app/manager/dashboard` (Requires Staff Login)
+- **Tab 6 (Manager Hub & AI Assistant)**: `https://resman-aqqx.vercel.app/manager/dashboard` (Requires Staff Login)
 
 ---
 
@@ -112,21 +134,7 @@ flowchart TD
 
 #### Step 9: Verified Dish Review & Executive Analytics (`/reviews/submit` & `/manager/dashboard`)
 1. On Tab 1, post-payment redirects the customer to submit 1-5 star ratings per ordered dish.
-2. Switch to Tab 6 (`/manager/dashboard`) to view updated real-time sales KPIs, average rating CSAT metrics, recipe profit margins, and AI Assistant query capabilities.
-
----
-
-## AI Manager Assistant Capabilities & Disclaimer
-
-The Manager Dashboard includes an integrated **AI Assistant** powered by the NVIDIA NIM API (Meta Llama 3.1 70B Instruct model) with live PostgreSQL context synthesis.
-
-### Capabilities
-- **Natural Language DB Querying**: Ask operational questions about daily revenue, top-selling dishes, low-stock ingredients, table occupancy, and kitchen order prep status.
-- **Real-Time SSE Streaming**: Responses stream word-by-word with a typewriter effect using Server-Sent Events.
-- **Starter Suggestions**: Clickable prompt chips for instant executive summaries.
-- **Operational Fallback**: Automatically falls back to a live context synthesis engine if external API limits are reached.
-
-> **Accuracy Notice**: The AI Assistant utilizes large language model inference to answer queries based on live database snapshots. While designed with operational guardrails, AI responses may occasionally make mistakes, hallucinate numbers, or produce unexpected phrasing. Managers should verify critical inventory or billing data directly on the core management screens.
+2. Switch to Tab 6 (`/manager/dashboard`) to view updated real-time sales KPIs, average rating CSAT metrics, recipe profit margins, and test the AI Assistant streaming queries.
 
 ---
 
@@ -134,6 +142,7 @@ The Manager Dashboard includes an integrated **AI Assistant** powered by the NVI
 
 | Feature | Status | Implementation Details |
 |---|---|---|
+| **AI Manager Assistant** | Functional | Powered by NVIDIA NIM API (`meta/llama-3.1-70b-instruct`) with live PostgreSQL context synthesis, real-time SSE streaming responses, and starter prompt suggestions. |
 | **Split Bill Calculation** | Functional / Structured | Split bill calculations (equal per-person split and itemized shares) are fully functional on the frontend and backend. The backend architecture includes structures for sending individual payment links to each person's phone number so each guest can pay their exact share from their own device. However, **direct SMS message dispatch is currently inactive** due to the lack of free-tier SMS gateway API trials (e.g. Twilio trial limits). Guests can still calculate and settle split amounts directly on the payment page. |
 | **KDS Kanban Board** | Functional | Drag-and-drop Kanban view with status columns (`Pending`, `Preparing`, `Ready`, `Completed`, `Paused`) with automatic screen-size defaults (Grid on mobile, Kanban on desktop). |
 | **Audio Notification Chimes** | Functional | Web Audio API sound alerts for waiter notification events and customer order status updates (`Preparing`, `Ready`, `Served`). |
@@ -148,6 +157,42 @@ The Manager Dashboard includes an integrated **AI Assistant** powered by the NVI
 - **Authentication**: Clerk JWT with Role-Based Access Control (RBAC).
 - **LLM Integration**: NVIDIA NIM API (`meta/llama-3.1-70b-instruct`) with SSE streaming.
 - **Payments**: Razorpay (UPI, Card, Net Banking) with backend HMAC signature verification.
+
+---
+
+## Key System Components
+
+1. **Customer QR Portal (`/join` & `/join/menu`)**
+   - Entrance QR check-in with automatic table allocation or waitlist assignment.
+   - Live category filtering, search, and dish customization.
+   - Real-time order progress tracking, audio chimes, and status toast notifications.
+   - Digital bill request and Razorpay online checkout or cash payment.
+   - Post-payment verified dish review submission.
+
+2. **Kitchen Display System (`/kitchen/dashboard`)**
+   - Drag-and-drop Kanban interface for order status transitions.
+   - Dedicated Paused column and custom pause reason modal.
+   - Auto-deduction of raw ingredient inventory based on dish recipe configurations.
+   - Priority tagging (Normal, High, Urgent) and prep time elapsed warnings.
+
+3. **Waiter POS (`/waiter/dashboard`)**
+   - Real-time table matrix showing occupancy and guest verification status.
+   - Audio chime notifications for incoming customer alerts and bill requests.
+   - One-click session bill generation.
+
+4. **Cashier POS (`/cashier`)**
+   - Settlement terminal for cash, card, and digital transactions.
+   - Cash change calculator and receipt printing.
+
+5. **Manager Executive Hub & AI Assistant (`/manager/dashboard`)**
+   - Executive KPIs: daily revenue, occupancy rate, low-stock counts, average rating.
+   - AI Manager Assistant powered by NVIDIA NIM for natural language database queries.
+   - Global restaurant status toggle (Open / Closed).
+   - Recipe profitability and gross margin analysis.
+
+6. **Inventory & Recipes (`/inventory` & `/recipes`)**
+   - Ingredient stock tracking, restock logs, and waste recording.
+   - Automated recipe costing and margin calculation per dish.
 
 ---
 
