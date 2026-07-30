@@ -18,8 +18,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set database connection URL from Settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Set database connection URL from Settings (convert to asyncpg format)
+from app.db.session import get_async_db_url_and_args
+
+_async_url, _ = get_async_db_url_and_args(settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", _async_url)
 
 target_metadata = Base.metadata
 
