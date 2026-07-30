@@ -1,15 +1,58 @@
 # ResMan OS — Enterprise Restaurant Management System
 
-ResMan OS is a full-stack restaurant management system built for dine-in operations. It digitizes the end-to-end restaurant workflow—from guest check-in via entrance QR code scanning, table allocation, digital menu browsing, and ordering, through to kitchen display execution, automated inventory deduction, cashier POS settlement, Razorpay online payments, and post-meal customer reviews.
+> **Vibeathon 6.0** · Team **ApexVoid** · Solo Participant: **Ayush Kumar**
+
+ResMan OS is a full-stack restaurant management system built for modern dine-in operations for **Vibeathon 6.0**. It digitizes the entire restaurant workflow—starting when a customer scans the **Entrance QR Code** to check in at `/join`, get assigned a table or join the waitlist, browse the digital menu, and place orders, through to kitchen display execution, automated recipe inventory deduction, cashier POS settlement, Razorpay payments, live notification chimes, and post-meal customer reviews.
 
 ---
 
 ## Live Deployments & API Reference
 
-- **Frontend Application**: [https://resman-aqqx.vercel.app](https://resman-aqqx.vercel.app)
-- **Backend API**: [https://resman-backend.onrender.com](https://resman-backend.onrender.com)
-- **OpenAPI / Swagger Documentation**: [https://resman-backend.onrender.com/docs](https://resman-backend.onrender.com/docs)
-- **ReDoc Documentation**: [https://resman-backend.onrender.com/redoc](https://resman-backend.onrender.com/redoc)
+| Component | URL | Status |
+|---|---|---|
+| **Frontend Application** | [https://resman-aqqx.vercel.app](https://resman-aqqx.vercel.app) | Live on Vercel |
+| **Backend API** | [https://resman-backend.onrender.com](https://resman-backend.onrender.com) | Live on Render |
+| **OpenAPI / Swagger Docs** | [https://resman-backend.onrender.com/docs](https://resman-backend.onrender.com/docs) | Interactive API Spec |
+| **ReDoc Documentation** | [https://resman-backend.onrender.com/redoc](https://resman-backend.onrender.com/redoc) | ReDoc API Spec |
+
+---
+
+## Team & Hackathon Information
+
+- **Hackathon**: Vibeathon 6.0
+- **Team Name**: ApexVoid
+- **Team Lead & Solo Developer**: Ayush Kumar
+- **Project Name**: ResMan OS
+
+---
+
+## Complete End-to-End Workflow Lifecycle
+
+```mermaid
+flowchart TD
+    S1["1. Customer QR Check-in (/join)"] --> S2["2. Waiter Verifies Arrival (/waiter)"]
+    S2 --> S3["3. Browse & Place Order (/join/menu)"]
+    S3 --> S4["4. Kitchen KDS Prepares & Deducts Stock (/kitchen)"]
+    S4 --> S5["5. Real-time Sound & Toast Alert to Customer"]
+    S5 --> S6["6. Waiter Serves Food & Multi-Round Orders"]
+    S6 --> S7["7. Customer Requests Bill (/join/menu)"]
+    S7 --> S8["8. Payment: Razorpay Online or Cashier Cash (/billing)"]
+    S8 --> S9["9. Cleaning Queue & Auto-Next Waitlist Assignment"]
+    S9 --> S10["10. Verified Customer Dish Review (/reviews/submit)"]
+```
+
+### Workflow Steps
+
+1. **Entrance QR Scan & Customer Check-In (`/join`)**: Guest scans QR, enters party size, and receives auto table allocation or waitlist placement.
+2. **Waiter Dashboard Arrival Verification (`/waiter/dashboard`)**: Staff verifies arrival at the assigned table.
+3. **Digital Menu & Ordering (`/join/menu`)**: Customer browses menu, adds dish notes, and submits orders.
+4. **Kitchen KDS & Stock Deduction (`/kitchen/dashboard`)**: Orders stream to Kanban KDS. Accepting orders automatically deducts raw ingredient stock via configured recipes.
+5. **Real-Time Sound & Status Alert**: Status updates (`Preparing`, `Ready`, `Served`) trigger browser audio chimes and toast alerts on the customer screen.
+6. **Waiter Serving & Multi-Round Orders**: Waiter marks dishes served; customers can add extra items to their active dining session.
+7. **Consolidated Bill Request (`/join/menu`)**: Customer requests the bill once dining is complete.
+8. **Bill Settlement & Payments (`/billing/[billId]` or `/cashier`)**: Customer pays online via Razorpay (supporting split calculations) or via Cashier POS cash settlement.
+9. **Cleaning Queue & Auto-Assignment (`/cleaning/dashboard`)**: Cleaning staff marks table cleaned, automatically re-assigning it to the next waitlisted group.
+10. **Verified Customer Dish Review (`/reviews/submit`)**: Verified customers leave star ratings per dish; managers review analytics on Executive Dashboard.
 
 ---
 
@@ -36,7 +79,7 @@ ResMan OS is a full-stack restaurant management system built for dine-in operati
 1. **Customer QR Portal (`/join` & `/join/menu`)**
    - Entrance QR check-in with automatic table allocation or waitlist assignment.
    - Live category filtering, search, and dish customization.
-   - Real-time order progress tracking and status toast notifications.
+   - Real-time order progress tracking, audio chimes, and status toast notifications.
    - Digital bill request and Razorpay online checkout or cash payment.
    - Post-payment verified dish review submission.
 
@@ -148,11 +191,9 @@ CLERK_SECRET_KEY=sk_test_xxx
 
 ---
 
-## Changelog
+## Changes Since Round 1 (Commit `32ecdb9d661f07ea9b8b08b1839828fea9dda582`)
 
-### Changes Since Commit `32ecdb9d661f07ea9b8b08b1839828fea9dda582`
-
-#### Features Added
+### Features Added
 - **AI Manager Assistant Streaming**: Added a Server-Sent Events (SSE) streaming endpoint (`/api/v1/manager/ai/chat/stream`) and frontend integration in `AIChatDrawer.tsx` for real-time word-by-word AI response streaming.
 - **NVIDIA NIM & Database Context Integration**: Built context synthesis engine combining live sales, low stock, active orders, and table occupancy data into system prompts for Meta Llama 3.1 70B Instruct model with automatic fallback engine.
 - **KDS Kanban Board Enhancements**: Converted Kitchen Display System to a flex-scrolling Drag & Drop Kanban board with status columns (`Pending`, `Preparing`, `Ready`, `Completed`, and `Paused`).
@@ -162,7 +203,7 @@ CLERK_SECRET_KEY=sk_test_xxx
 - **Dynamic Billing Charges**: Added restaurant-configurable tax and service charge percentages applied during bill generation.
 - **Menu Ratings**: Added customer star rating aggregation to menu items displayed on guest menus.
 
-#### Fixes & Improvements
+### Fixes & Improvements
 - **Persistent Header Layout**: Refactored `AppLayout.tsx` to fix the top navigation bar at the top of the viewport across mobile and desktop devices.
 - **PostgreSQL Migration Compatibility**: Updated startup DB initialization (`db/session.py`) to handle automatic column migrations (`is_closed` settings) on PostgreSQL instances.
 - **Billing Eager Loading**: Fixed SQLAlchemy `MissingGreenlet` async execution errors during bill generation by eagerly loading items and table relationships.
@@ -170,7 +211,7 @@ CLERK_SECRET_KEY=sk_test_xxx
 - **NVIDIA NIM Timeout Handling**: Extended HTTP client timeout to 45 seconds for high-parameter model inference.
 - **Frontend Split Bill**: Replaced backend API split bill calculations with an inline frontend per-person calculator.
 
-#### UI Cleanups
+### UI Cleanups
 - Removed obsolete "Register" button from the main navigation header bar.
 - Removed non-functional "Stock Audit History" tab from the Inventory Control page.
 - Restricted Waiter POS notifications container height with vertical scrolling to prevent page overflow.
