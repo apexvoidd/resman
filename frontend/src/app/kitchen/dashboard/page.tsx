@@ -345,16 +345,47 @@ function KitchenDashboardPage() {
         )}
 
         {/* Toolbar: Search, Status Tabs & Sorting */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 Search Order Number..."
-            className="w-full md:w-64 rounded-xl bg-gray-950 px-3.5 py-2 text-xs text-white placeholder-gray-500 ring-1 ring-white/10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
-          />
+        <div className="flex flex-col gap-3 rounded-2xl border border-gray-800 bg-gray-900 p-3 sm:p-4">
+          {/* Row 1: Search + Layout Toggle + Sort */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="🔍 Search Order Number..."
+              className="w-full sm:w-56 rounded-xl bg-gray-950 px-3.5 py-2 text-xs text-white placeholder-gray-500 ring-1 ring-white/10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+            />
+            <div className="flex items-center gap-2 sm:ml-auto">
+              <div className="flex items-center gap-1 bg-gray-950 p-1 rounded-xl border border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setLayoutMode("kanban")}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${layoutMode === "kanban" ? "bg-amber-500 text-gray-950 shadow" : "text-gray-400 hover:text-white"}`}
+                >
+                  📋 Board
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLayoutMode("grid")}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${layoutMode === "grid" ? "bg-amber-500 text-gray-950 shadow" : "text-gray-400 hover:text-white"}`}
+                >
+                  📦 Grid
+                </button>
+              </div>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as "oldest" | "newest" | "longest_waiting")}
+                className="rounded-xl bg-gray-950 px-3 py-2 text-xs text-white ring-1 ring-white/10 focus:outline-none"
+              >
+                <option value="oldest">Oldest (FIFO)</option>
+                <option value="newest">Newest</option>
+                <option value="longest_waiting">Longest Waiting</option>
+              </select>
+            </div>
+          </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none whitespace-nowrap">
+          {/* Row 2: Status Filter Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
             {[
               { label: "Active", value: "active" },
               { label: "Pending", value: "pending" },
@@ -367,11 +398,9 @@ function KitchenDashboardPage() {
                 key={value}
                 type="button"
                 onClick={() => setStatusFilter(value)}
-                className={`whitespace-nowrap capitalize rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                className={`whitespace-nowrap shrink-0 capitalize rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
                   statusFilter === value
-                    ? value === "completed"
-                      ? "bg-emerald-700 text-white"
-                      : "bg-amber-500 text-gray-950"
+                    ? value === "completed" ? "bg-emerald-700 text-white" : "bg-amber-500 text-gray-950"
                     : "bg-gray-950 text-gray-400 hover:text-white"
                 }`}
               >
@@ -379,48 +408,11 @@ function KitchenDashboardPage() {
               </button>
             ))}
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 bg-gray-950 p-1 rounded-xl border border-gray-800">
-              <button
-                type="button"
-                onClick={() => setLayoutMode("kanban")}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${
-                  layoutMode === "kanban"
-                    ? "bg-amber-500 text-gray-950 shadow"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                📋 Drag & Drop Board
-              </button>
-              <button
-                type="button"
-                onClick={() => setLayoutMode("grid")}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${
-                  layoutMode === "grid"
-                    ? "bg-amber-500 text-gray-950 shadow"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                📦 Grid View
-              </button>
-            </div>
-
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as "oldest" | "newest" | "longest_waiting")}
-              className="rounded-xl bg-gray-950 px-3 py-2 text-xs text-white ring-1 ring-white/10 focus:outline-none"
-            >
-              <option value="oldest">Sort: Oldest Order (FIFO)</option>
-              <option value="newest">Sort: Newest Order</option>
-              <option value="longest_waiting">Sort: Longest Waiting</option>
-            </select>
-          </div>
         </div>
 
         {/* KDS Main View: Kanban Board vs Grid View */}
         {layoutMode === "kanban" ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-start">
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0 items-start">
             {[
               { id: "pending", title: "Pending", icon: "🟧", color: "border-amber-500/40 bg-amber-500/10 text-amber-400" },
               { id: "accepted", title: "Accepted", icon: "🟦", color: "border-blue-500/40 bg-blue-500/10 text-blue-400" },
@@ -441,7 +433,7 @@ function KitchenDashboardPage() {
                     e.preventDefault();
                     handleDropToStatus(col.id);
                   }}
-                  className={`flex flex-col rounded-2xl border p-3.5 transition min-h-[550px] ${
+                  className={`flex flex-col rounded-2xl border p-3.5 transition min-h-[520px] min-w-[300px] w-[300px] shrink-0 snap-start lg:w-auto lg:min-w-0 lg:flex-1 ${
                     dragOverColumn === col.id
                       ? "border-amber-400 bg-amber-500/10 ring-2 ring-amber-500/40"
                       : "border-gray-800 bg-gray-900/60"

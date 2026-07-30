@@ -171,9 +171,14 @@ export function AIChatDrawer() {
               🤖
             </div>
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#F8FAFC]">
-                AI Manager Assistant
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#F8FAFC]">
+                  AI Manager Assistant
+                </h3>
+                <span className="rounded-full bg-[#7C3AED]/20 border border-[#7C3AED]/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#A78BFA]">
+                  Beta
+                </span>
+              </div>
               <p className="text-[10px] font-semibold text-[#22C55E] flex items-center space-x-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#22C55E] animate-pulse"></span>
                 <span>Connected to Live ResMan DB</span>
@@ -203,73 +208,32 @@ export function AIChatDrawer() {
         {/* Message Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
-            <div className="flex h-full flex-col justify-start space-y-3 px-1 py-2">
+            <div className="flex h-full flex-col justify-center space-y-4 text-center px-4">
               {/* Header */}
-              <div className="flex flex-col items-center text-center gap-2 pt-2">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2563EB]/10 border border-[#2563EB]/30 text-2xl">
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#2563EB]/10 border border-[#2563EB]/30 text-3xl">
                   🧠
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-[#F8FAFC]">ResMan AI Assistant</h4>
-                  <p className="mt-0.5 text-[11px] text-[#64748B]">Powered by live database context</p>
-                </div>
-              </div>
-
-              {/* Warning Banner */}
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 flex gap-2.5 items-start">
-                <span className="text-amber-400 text-sm mt-0.5 shrink-0">⚠️</span>
-                <div>
-                  <p className="text-[11px] font-semibold text-amber-300">Accuracy Warning</p>
-                  <p className="text-[10px] text-amber-400/80 mt-0.5 leading-relaxed">
-                    Responses are based on a limited today-only snapshot. Historical trends, multi-day comparisons, and detailed analytics may be incomplete or missing. Always verify critical decisions with full reports.
+                  <p className="mt-1 text-xs text-[#94A3B8]">
+                    Ask me anything about revenue, orders, inventory, table occupancy, or staff performance!
                   </p>
-                </div>
-              </div>
-
-              {/* Data Coverage */}
-              <div className="rounded-lg border border-[#1E293B] bg-[#0F172A] overflow-hidden">
-                <div className="px-3 py-2 border-b border-[#1E293B] flex items-center gap-1.5">
-                  <span className="text-[10px]">📦</span>
-                  <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">What I know right now</p>
-                </div>
-                <div className="divide-y divide-[#1E293B]">
-                  {[
-                    { icon: "💰", label: "Revenue & Bills",       scope: "Today only",         note: "Since midnight UTC" },
-                    { icon: "📋", label: "Orders",                scope: "Today + live queue",  note: "Active kitchen tickets" },
-                    { icon: "🪑", label: "Table Occupancy",       scope: "Live (right now)",    note: "Current status only" },
-                    { icon: "📦", label: "Stock & Ingredients",   scope: "Live levels",         note: "Top 10 low-stock items" },
-                    { icon: "🗑️", label: "Waste",                 scope: "Today only",          note: "Cost impact since midnight" },
-                    { icon: "📖", label: "Recipe Profitability",  scope: "All-time",            note: "Top 5 lowest margin recipes" },
-                    { icon: "⭐", label: "CSAT / Reviews",        scope: "All-time avg only",   note: "No recent review text" },
-                    { icon: "👥", label: "Staff Count",           scope: "Live (right now)",    note: "Active staff only" },
-                    { icon: "🗨️", label: "Chat Memory",           scope: "Last 10 messages",   note: "~5 turns, then forgotten" },
-                  ].map(({ icon, label, scope, note }) => (
-                    <div key={label} className="flex items-center justify-between px-3 py-2 gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-xs shrink-0">{icon}</span>
-                        <span className="text-[11px] font-medium text-[#CBD5E1] truncate">{label}</span>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-[10px] font-semibold text-[#2563EB]">{scope}</p>
-                        <p className="text-[9px] text-[#475569]">{note}</p>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
 
               {/* Suggested Questions */}
               {suggestions.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold text-[#475569] uppercase tracking-wider px-1">
-                    Try asking:
+                <div className="space-y-2 text-left">
+                  <p className="text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider">
+                    Suggested Questions:
                   </p>
-                  <div className="flex flex-col space-y-1.5">
+                  <div className="flex flex-col space-y-2">
                     {suggestions.map((q, idx) => (
                       <button
                         key={idx}
                         onClick={() => handleSend(q)}
-                        className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-2.5 text-left text-[11px] font-medium text-[#CBD5E1] hover:border-[#2563EB] hover:bg-[#1E293B] hover:text-white transition"
+                        className="rounded-lg border border-[#334155] bg-[#0F172A] p-2.5 text-left text-xs font-medium text-[#CBD5E1] hover:border-[#2563EB] hover:bg-[#1E293B] hover:text-white transition"
                       >
                         💡 {q}
                       </button>
@@ -278,6 +242,7 @@ export function AIChatDrawer() {
                 </div>
               )}
             </div>
+
 
           ) : (
             <>
