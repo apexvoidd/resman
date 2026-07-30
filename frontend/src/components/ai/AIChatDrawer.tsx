@@ -4,6 +4,60 @@ import { useRBAC } from "@/hooks/use-rbac";
 import { fetchAISuggestions, sendAIChatMessage, AIChatMessage } from "@/services/ai";
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+function MarkdownMessage({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        h1: ({ children }) => <h1 className="text-sm font-bold text-white mb-2 mt-3 first:mt-0">{children}</h1>,
+        h2: ({ children }) => <h2 className="text-xs font-bold text-[#E2E8F0] mb-1.5 mt-3 first:mt-0 uppercase tracking-wide">{children}</h2>,
+        h3: ({ children }) => <h3 className="text-xs font-semibold text-[#CBD5E1] mb-1 mt-2 first:mt-0">{children}</h3>,
+        p: ({ children }) => <p className="text-xs leading-relaxed text-[#E2E8F0] mb-2 last:mb-0">{children}</p>,
+        strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
+        em: ({ children }) => <em className="italic text-[#CBD5E1]">{children}</em>,
+        ul: ({ children }) => <ul className="list-none space-y-1 mb-2 pl-1">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-2 pl-1 text-xs text-[#E2E8F0]">{children}</ol>,
+        li: ({ children }) => (
+          <li className="flex items-start gap-1.5 text-xs text-[#E2E8F0] leading-relaxed">
+            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#2563EB]" />
+            <span>{children}</span>
+          </li>
+        ),
+        code: ({ children, className }) => {
+          const isBlock = className?.includes("language-");
+          return isBlock ? (
+            <code className="block bg-[#020617] border border-[#334155] rounded-lg px-3 py-2 text-[11px] font-mono text-[#7DD3FC] my-2 overflow-x-auto">{children}</code>
+          ) : (
+            <code className="bg-[#1E293B] border border-[#334155] rounded px-1.5 py-0.5 text-[11px] font-mono text-[#7DD3FC]">{children}</code>
+          );
+        },
+        pre: ({ children }) => <pre className="my-2 overflow-x-auto">{children}</pre>,
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-2 border-[#2563EB] pl-3 my-2 text-xs text-[#94A3B8] italic">{children}</blockquote>
+        ),
+        table: ({ children }) => (
+          <div className="overflow-x-auto my-2 rounded-lg border border-[#334155]">
+            <table className="w-full text-[11px]">{children}</table>
+          </div>
+        ),
+        thead: ({ children }) => <thead className="bg-[#1E293B] text-[#94A3B8] uppercase tracking-wider">{children}</thead>,
+        tbody: ({ children }) => <tbody className="divide-y divide-[#1E293B]">{children}</tbody>,
+        tr: ({ children }) => <tr className="hover:bg-[#1E293B]/50 transition-colors">{children}</tr>,
+        th: ({ children }) => <th className="px-3 py-2 text-left font-semibold">{children}</th>,
+        td: ({ children }) => <td className="px-3 py-2 text-[#CBD5E1]">{children}</td>,
+        hr: () => <hr className="border-[#334155] my-3" />,
+        a: ({ href, children }) => (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#2563EB] underline underline-offset-2 hover:text-[#60A5FA] transition-colors">{children}</a>
+        ),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
 
 export function AIChatDrawer() {
   const { getToken } = useAuth();
@@ -211,7 +265,11 @@ export function AIChatDrawer() {
                         )}
                       </div>
                     )}
-                    <div className="whitespace-pre-wrap font-sans">{msg.content}</div>
+                    {msg.role === "assistant" ? (
+                      <MarkdownMessage content={msg.content} />
+                    ) : (
+                      <div className="text-xs leading-relaxed">{msg.content}</div>
+                    )}
                   </div>
                 </div>
               ))}
