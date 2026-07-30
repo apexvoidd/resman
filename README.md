@@ -38,15 +38,6 @@ ResMan OS is a full-stack restaurant management system built for modern dine-in 
 
 ---
 
-> [!IMPORTANT]
-> ### Executive Oversight: Manager & Admin Master Control
-> The **Manager Executive Hub** (`/manager/dashboard`) acts as the command center for the entire restaurant.
-> - **Full System Visibility**: Monitor live sales revenue KPIs, table occupancy rates, kitchen prep queues, low-stock alerts, customer CSAT ratings, and recipe gross margins.
-> - **Master Role Access**: Admin and Manager roles have elevated permissions to access ALL staff screens (Waiter POS, Kitchen KDS, Cashier POS, Cleaning Queue, Inventory Control, and Review Management) seamlessly without switching accounts.
-> - **Store Control**: Toggle store Open/Closed status, adjust tax/service charge percentages, and issue urgent broadcast announcements to staff.
-
----
-
 ## Testing Guide & End-to-End Workflow
 
 ### Recommended Setup (Single Device or Multi-Device)
