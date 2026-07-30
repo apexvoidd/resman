@@ -57,6 +57,7 @@ export function AIChatDrawer() {
       const assistantMsg: AIChatMessage = {
         role: "assistant",
         content: response.reply,
+        engine: response.engine_used,
       };
       setMessages((prev) => [...prev, assistantMsg]);
       if (response.suggested_questions && response.suggested_questions.length > 0) {
@@ -197,8 +198,17 @@ export function AIChatDrawer() {
                     }`}
                   >
                     {msg.role === "assistant" && (
-                      <div className="mb-1.5 flex items-center space-x-1.5 text-[10px] font-bold uppercase text-[#2563EB]">
-                        <span>🤖 ResMan AI</span>
+                      <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase">
+                        <span className="text-[#2563EB]">🤖 ResMan AI</span>
+                        {msg.engine === "nvidia_nim" ? (
+                          <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-purple-300 border border-purple-500/30">
+                            ✨ NVIDIA NIM (Llama 3.1)
+                          </span>
+                        ) : (
+                          <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-emerald-300 border border-emerald-500/30">
+                            📊 Live ResMan DB
+                          </span>
+                        )}
                       </div>
                     )}
                     <div className="whitespace-pre-wrap font-sans">{msg.content}</div>

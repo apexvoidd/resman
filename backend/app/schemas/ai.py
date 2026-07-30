@@ -20,5 +20,6 @@ class AIChatRequest(BaseModel):
 class AIChatResponse(BaseModel):
     reply: str = Field(..., description="AI Assistant reply")
     session_id: str = Field(..., description="Session identifier")
+    engine_used: str = Field("live_db_fallback", description="Engine used: 'nvidia_nim' or 'live_db_fallback'")
     suggested_questions: list[str] = Field(default_factory=list, description="Suggested follow-up questions")
     context_summary: Optional[dict[str, Any]] = Field(None, description="Summary of live data context used")

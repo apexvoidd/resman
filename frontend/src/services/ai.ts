@@ -3,6 +3,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export interface AIChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  engine?: string;
 }
 
 export interface AIChatRequestPayload {
@@ -14,6 +15,7 @@ export interface AIChatRequestPayload {
 export interface AIChatResponseData {
   reply: string;
   session_id: string;
+  engine_used: string;
   suggested_questions: string[];
   context_summary?: Record<string, unknown>;
 }

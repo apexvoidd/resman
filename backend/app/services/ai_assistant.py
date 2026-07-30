@@ -282,9 +282,15 @@ async def process_ai_chat(
     nim_api_key = os.getenv("NVIDIA_NIM_API_KEY") or os.getenv("NVIDIA_API_KEY")
 
     reply_text = None
+    engine_used = "live_db_fallback"
+
+    logger.info("==================================================")
+    logger.info(f"🤖 [AI MANAGER ASSISTANT] Received Query: '{message}'")
+    logger.info(f"🔑 API Key Found: {'YES (NVIDIA NIM)' if nim_api_key else 'NO (Using Live DB Fallback)'}")
 
     if nim_api_key:
         try:
+            logger.info(f"🚀 Calling NVIDIA NIM API (Model: {NVIDIA_NIM_MODEL})...")
             system_prompt = build_system_prompt(context)
             messages = [{"role": "system", "content": system_prompt}]
             
@@ -313,14 +319,21 @@ async def process_ai_chat(
                     choices = data.get("choices", [])
                     if choices:
                         reply_text = choices[0].get("message", {}).get("content")
+                        engine_used = "nvidia_nim"
+                        logger.info("✅ NVIDIA NIM API response received successfully (200 OK)")
                 else:
-                    logger.warning(f"NVIDIA NIM API returned status {response.status_code}: {response.text}")
+                    logger.warning(f"⚠️ NVIDIA NIM API returned status {response.status_code}: {response.text}")
         except Exception as e:
-            logger.error(f"NVIDIA NIM API call failed: {e}")
+            logger.error(f"❌ NVIDIA NIM API call failed with exception: {e}")
 
     # 4. Fallback synthesis if NIM call did not execute or failed
     if not reply_text:
+        logger.info("⚡ Processing response via Built-in Live Context Engine...")
         reply_text = generate_fallback_synthesis(message, context)
+        engine_used = "live_db_fallback"
+
+    logger.info(f"🏁 Final Engine Used: {engine_used.upper()}")
+    logger.info("==================================================")
 
     # 5. Build relevant suggested follow-up questions
     suggested = [
@@ -333,6 +346,7 @@ async def process_ai_chat(
     return AIChatResponse(
         reply=reply_text,
         session_id=session_id,
+        engine_used=engine_used,
         suggested_questions=suggested,
         context_summary={
             "today_revenue": context["overview"].get("today_revenue"),
