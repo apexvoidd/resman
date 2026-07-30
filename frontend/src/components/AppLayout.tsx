@@ -7,6 +7,7 @@ import { fetchSettings, updateSettings, RestaurantSettings } from "@/services/se
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AIChatDrawer } from "@/components/ai/AIChatDrawer";
 
 function RestaurantStatusToggle() {
   const { getToken } = useAuth();
@@ -354,6 +355,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 p-3 sm:p-6 lg:p-8 bg-[#0F172A] text-[#F8FAFC]">{children}</main>
+        <AIChatDrawer />
       </div>
     </div>
   );
