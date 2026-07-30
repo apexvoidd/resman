@@ -1,7 +1,7 @@
 "use client";
 
 import { RouteGuard } from "@/components/RouteGuard";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRBAC } from "@/hooks/use-rbac";
 import {
@@ -50,6 +50,46 @@ function WaiterDashboardPage() {
   const [rejectReason, setRejectReason] = useState<string>("");
 
   const isStaffAuthorized = hasRole("waiter") || hasRole("manager") || hasRole("admin");
+
+  // --- Notification sound ---
+  const knownNotifIds = useRef<Set<string>>(new Set());
+  const isInitialLoad = useRef(true);
+
+  const playNotificationChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      // Two-tone descending chime: 880 Hz → 440 Hz
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.25);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.5);
+    } catch {
+      // Browser blocked audio or AudioContext not supported — fail silently
+    }
+  };
+
+  useEffect(() => {
+    if (isInitialLoad.current) {
+      // Record IDs on first load — don't play sound for pre-existing notifications
+      notifications.forEach((n) => knownNotifIds.current.add(n.id));
+      isInitialLoad.current = false;
+      return;
+    }
+    const newOnes = notifications.filter((n) => !knownNotifIds.current.has(n.id));
+    if (newOnes.length > 0) {
+      playNotificationChime();
+      newOnes.forEach((n) => knownNotifIds.current.add(n.id));
+    }
+  }, [notifications]);
+  // --- end notification sound ---
 
   const loadData = async () => {
     try {
