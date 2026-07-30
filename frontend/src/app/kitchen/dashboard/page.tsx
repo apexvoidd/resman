@@ -30,6 +30,7 @@ function KitchenDashboardPage() {
   // Filters & Search
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("active");
+  const [sortBy, setSortBy] = useState<"oldest" | "newest" | "longest_waiting">("oldest");
   const [layoutMode, setLayoutMode] = useState<"kanban" | "grid">("kanban");
 
   // Default to grid view on mobile (< 768px), kanban view on PC / desktop
